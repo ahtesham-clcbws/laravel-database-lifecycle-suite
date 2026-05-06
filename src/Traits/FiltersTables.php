@@ -24,13 +24,13 @@ trait FiltersTables
     protected function getFilteredTables(?string $connection = null): array
     {
         $conn = DB::connection($connection);
-        $dbName = $conn->getDatabaseName();
+        $driver = $conn->getDriverName();
         $tables = Schema::connection($connection)->getTables();
 
-        // SQLite doesn't support cross-database schema leaks in the same way 
-        // as MySQL/PostgreSQL, and getDatabaseName() often returns the file path 
-        // while getTables() returns 'main'. We skip filtering for SQLite.
-        if ($conn->getDriverName() === 'sqlite') {
+        // The "Cross-Database Leak" is a specific behavior of the MySQL/MariaDB 
+        // driver in Laravel 11/12. For other drivers (PostgreSQL, SQL Server, SQLite), 
+        // we return the tables as-is to avoid accidental filtering of valid schemas.
+        if (!in_array($driver, ['mysql', 'mariadb'])) {
             return $tables;
         }
         
