@@ -23,9 +23,18 @@ trait FiltersTables
      */
     protected function getFilteredTables(?string $connection = null): array
     {
-        $dbName = DB::connection($connection)->getDatabaseName();
+        $conn = DB::connection($connection);
+        $dbName = $conn->getDatabaseName();
+        $tables = Schema::connection($connection)->getTables();
+
+        // SQLite doesn't support cross-database schema leaks in the same way 
+        // as MySQL/PostgreSQL, and getDatabaseName() often returns the file path 
+        // while getTables() returns 'main'. We skip filtering for SQLite.
+        if ($conn->getDriverName() === 'sqlite') {
+            return $tables;
+        }
         
-        return \collect(Schema::connection($connection)->getTables())
+        return \collect($tables)
             ->filter(fn($table) => ($table['schema'] ?? null) === $dbName)
             ->values()
             ->toArray();

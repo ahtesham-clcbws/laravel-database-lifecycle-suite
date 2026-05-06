@@ -52,4 +52,20 @@ class IndexHealthAuditorTest extends TestCase
         $commentViolations = \collect($missing)->where('table', 'comments');
         $this->assertCount(0, $commentViolations);
     }
+
+    public function test_it_detects_potential_foreign_keys_by_naming_convention()
+    {
+        Schema::create('categories', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('parent_id'); // Looks like FK, but no index/FK defined
+            $table->string('name');
+        });
+
+        $missing = $this->auditor->getMissingIndexes();
+
+        $categoryViolations = \collect($missing)->where('table', 'categories');
+        $this->assertCount(1, $categoryViolations);
+        $this->assertEquals('parent_id', $categoryViolations->first()['column']);
+        $this->assertEquals('Potential Foreign Key', $categoryViolations->first()['type']);
+    }
 }
