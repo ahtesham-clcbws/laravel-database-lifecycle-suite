@@ -1,0 +1,9 @@
+/vendor/
+.env
+.agent
+composer.lock
+phpunit.xml
+.phpunit.result.cache
+/legacy_bridge_output/
+/integration_test/
+*.code-workspace
