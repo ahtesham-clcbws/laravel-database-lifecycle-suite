@@ -24,6 +24,7 @@ trait FiltersTables
     protected function getFilteredTables(?string $connection = null): array
     {
         $conn = DB::connection($connection);
+        $dbName = $conn->getDatabaseName();
         $driver = $conn->getDriverName();
         $tables = Schema::connection($connection)->getTables();
 
