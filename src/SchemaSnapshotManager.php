@@ -141,6 +141,35 @@ readonly class SchemaSnapshotManager
     }
 
     /**
+     * Conservative preflight: reject features the current restorer cannot
+     * round-trip faithfully. An unsupported snapshot must not be applied.
+     */
+    public function canRestoreWithoutLoss(array $definition): bool
+    {
+        if (!isset($definition['columns']) || !is_array($definition['columns'])) {
+            return false;
+        }
+
+        if (!empty($definition['indexes']) || !empty($definition['foreign_keys'])) {
+            return false;
+        }
+
+        foreach ($definition['columns'] as $column) {
+            if (!is_array($column)
+                || !isset($column['name'], $column['type_name'], $column['nullable'])
+                || !is_string($column['name'])
+                || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $column['name'])
+                || !in_array(strtolower((string) $column['type_name']), ['text'], true)
+                || ($column['default'] ?? null) !== null
+                || !is_bool($column['nullable'])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Restore a table from a snapshot definition.
      */
     public function restoreTable(string $tableName, array $definition, ?string $connection = null): bool
