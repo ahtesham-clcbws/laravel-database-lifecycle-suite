@@ -44,7 +44,14 @@ class SnapshotRestoreCommand extends Command
         $name = $this->argument('name');
         $connection = $this->option('database');
         $path = \base_path('database/snapshots');
-        $recreate = $this->option('recreate');
+        $recreate = (bool) $this->option('recreate');
+
+        // The snapshot format currently lacks sufficient information to recreate
+        // a table faithfully. Never drop existing data using an incomplete snapshot.
+        if ($recreate) {
+            $this->error('Unsafe restoration blocked: --recreate is not supported until full schema round-trip restoration is implemented.');
+            return self::FAILURE;
+        }
 
         $this->warn("!!! DANGER: You are about to restore structural state from snapshot [{$name}] !!!");
         
@@ -55,7 +62,19 @@ class SnapshotRestoreCommand extends Command
 
         try {
             $snapshot = $manager->load((string) $name, $path);
-            $tables = $snapshot['tables'];
+            $tables = $snapshot['tables'] ?? null;
+            if (!is_array($tables)) {
+                $this->error('Invalid snapshot: missing tables definition.');
+                return self::FAILURE;
+            }
+
+            // Validate *all* tables before changing any schema.
+            foreach ($tables as $tableName => $definition) {
+                if (!is_array($definition) || !$manager->canRestoreWithoutLoss($definition)) {
+                    $this->error("Cannot safely restore [{$tableName}]: snapshot contains unsupported schema features.");
+                    return self::FAILURE;
+                }
+            }
 
             foreach ($tables as $tableName => $definition) {
                 if (Schema::connection($connection)->hasTable($tableName)) {
@@ -69,7 +88,10 @@ class SnapshotRestoreCommand extends Command
                 }
 
                 $this->info(" + Restoring table: {$tableName}");
-                $manager->restoreTable((string) $tableName, $definition, $connection);
+                if (!$manager->restoreTable((string) $tableName, $definition, $connection)) {
+                    $this->error("Failed to restore table [{$tableName}].");
+                    return self::FAILURE;
+                }
             }
 
             $this->info("\n✅ Schema restoration complete.");
