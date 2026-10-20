@@ -57,7 +57,7 @@ class LegacyBridge
             $shortTable = $this->stripPrefix($table, $prefix);
             $results[$table] = [
                 'migration' => $this->generateMigration($table, $shortTable, $outputDir . '/migrations', $connection),
-                'model' => $this->generateModel($table, $shortTable, $outputDir . '/models'),
+                'model' => $this->generateModel($table, $shortTable, $outputDir . '/models', $connection),
                 'seeder' => $this->generateSeeder($table, $outputDir . '/seeders', $connection),
                 'factory' => $this->generateFactory($table, $shortTable, $outputDir . '/factories', $connection),
             ];
@@ -175,14 +175,14 @@ class LegacyBridge
     /**
      * Generate a Laravel Model for a table.
      */
-    protected function generateModel(string $fullTable, string $shortTable, string $path): string
+    protected function generateModel(string $fullTable, string $shortTable, string $path, ?string $connection = null): string
     {
         if (in_array($fullTable, $this->pivots)) {
             return "Skipped (Pivot table)";
         }
 
         $modelName = Str::studly(Str::singular($shortTable));
-        $columns = Schema::getColumnListing($fullTable);
+        $columns = Schema::connection($connection)->getColumnListing($fullTable);
         $fillable = array_diff($columns, ['id', 'created_at', 'updated_at']);
 
         $content = "<?php\n\nnamespace App\\Models;\n\n";
@@ -225,25 +225,22 @@ class LegacyBridge
      */
     protected function generateSeeder(string $table, string $path, ?string $connection = null): string
     {
+        // Never export real application rows (including secrets and PII) to
+        // generated PHP source files. The generated seeder is a safe scaffold.
         $seederName = Str::studly($table) . 'TableSeeder';
-        $data = DB::connection($connection)->table($table)->limit(100)->get();
-
         $content = "<?php\n\nnamespace Database\\Seeders;\n\n";
-        $content .= "use Illuminate\Database\Seeder;\n";
-        $content .= "use Illuminate\Support\Facades\DB;\n\n";
+        $content .= "use Illuminate\\Database\\Seeder;\n\n";
         $content .= "class {$seederName} extends Seeder\n{\n";
-        $content .= "    public function run()\n    {\n";
-        
-        foreach ($data as $row) {
-            $rowArray = var_export((array) $row, true);
-            $content .= "        DB::table('{$table}')->insert({$rowArray});\n";
-        }
-
+        $content .= "    public function run(): void\n    {\n";
+        $content .= "        // Add reviewed or synthetic reference data here.\n";
+        $content .= "        // Live database rows are intentionally not exported.\n";
         $content .= "    }\n}\n";
 
-        file_put_contents($path . '/' . $seederName . '.php', $content);
+        if (file_put_contents($path . '/' . $seederName . '.php', $content) === false) {
+            throw new \\RuntimeException("Failed to write generated seeder: {$seederName}");
+        }
 
-        return "Seeder generated: {$seederName}.php";
+        return "Safe seeder scaffold generated: {$seederName}.php";
     }
 
     /**
@@ -355,6 +352,18 @@ class LegacyBridge
         $columns = var_export($fk['columns'], true);
         $references = $fk['foreign_columns'][0];
         
-        return "\$table->foreign({$columns})->references('{$references}')->on('{$targetTable}')->onDelete('cascade')";
+        $statement = "\\$table->foreign({$columns})->references('{$references}')->on('{$targetTable}')";
+        $onDelete = strtolower((string) ($fk['on_delete'] ?? ''));
+        $allowedActions = ['cascade', 'restrict', 'set null', 'no action', 'set default'];
+        if (in_array($onDelete, $allowedActions, true)) {
+            $statement .= "->onDelete('" . $onDelete . "')";
+        }
+
+        $onUpdate = strtolower((string) ($fk['on_update'] ?? ''));
+        if (in_array($onUpdate, $allowedActions, true)) {
+            $statement .= "->onUpdate('" . $onUpdate . "')";
+        }
+
+        return $statement;
     }
 }
