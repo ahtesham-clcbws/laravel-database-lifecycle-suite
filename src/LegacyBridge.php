@@ -237,7 +237,7 @@ class LegacyBridge
         $content .= "    }\n}\n";
 
         if (file_put_contents($path . '/' . $seederName . '.php', $content) === false) {
-            throw new \\RuntimeException("Failed to write generated seeder: {$seederName}");
+            throw new \RuntimeException("Failed to write generated seeder: {$seederName}");
         }
 
         return "Safe seeder scaffold generated: {$seederName}.php";
@@ -352,7 +352,7 @@ class LegacyBridge
         $columns = var_export($fk['columns'], true);
         $references = $fk['foreign_columns'][0];
         
-        $statement = "\\$table->foreign({$columns})->references('{$references}')->on('{$targetTable}')";
+        $statement = "\$table->foreign({$columns})->references('{$references}')->on('{$targetTable}')";
         $onDelete = strtolower((string) ($fk['on_delete'] ?? ''));
         $allowedActions = ['cascade', 'restrict', 'set null', 'no action', 'set default'];
         if (in_array($onDelete, $allowedActions, true)) {
