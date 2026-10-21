@@ -1,0 +1,29 @@
+{
+  "run_id": "run_20261021_190101",
+  "start_time": "2026-10-21 19:01:01 UTC",
+  "end_time": "2026-10-21 19:04:18 UTC",
+  "overall_status": "PASS",
+  "git": {
+    "commit": "0938cd80df1b87c27f5d0d5cbb4b48e305b62222",
+    "branch": "development",
+    "worktree_clean": 1,
+    "commit_count": 48
+  },
+  "runtime": {
+    "php": "PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)",
+    "composer": "Composer version 2.10.3 2026-08-27 13:34:23"
+  },
+  "results": {
+    "composer_validate": "PASS",
+    "composer_audit": "PASS",
+    "pint": "PASS",
+    "phpstan": "PASS",
+    "phpunit_sqlite": "PASS",
+    "phpunit_mysql": "PASS",
+    "phpunit_mariadb": "PASS",
+    "phpunit_pgsql": "PASS",
+    "app_integration_laravel_11": "PASS",
+    "app_integration_laravel_12": "PASS",
+    "app_integration_laravel_13": "PASS"
+  }
+}

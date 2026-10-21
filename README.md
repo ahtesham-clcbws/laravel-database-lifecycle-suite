@@ -19,7 +19,7 @@
   - PostgreSQL (14+)
 
 > [!NOTE]
-> **Laravel 13 Support Statement**: Laravel 13 dropped PHP 8.2 support (requiring PHP 8.3+) and introduced substantial breaking shifts in console command contracts and DBAL schema metadata representations. In accordance with Semantic Versioning (SemVer), official Laravel 13 support will be released in the upcoming 2.0 major version to preserve PHP 8.2 compatibility for 1.x installations.
+> **Laravel 11, 12 & 13 Support Statement**: Laravel 11.x, 12.x, and 13.x are all supported and verified via real-world application integration tests across Scenarios A through L (schema snapshots, drift detection, seeder safety, and model generation). Note that Laravel 13 requires PHP ^8.3+. On PHP 8.2 systems, Laravel 11 or 12 is automatically resolved.
 
 ---
 
@@ -218,9 +218,9 @@ php artisan db:erd --output=docs/schema.mmd
 | Platform / Component | Supported Versions | Notes |
 | :--- | :--- | :--- |
 | **PHP** | `^8.2 \| ^8.3 \| ^8.4` | Verified in multi-version test matrix |
-| **Laravel Framework** | `^11.0 \| ^12.0` | Verified on Laravel 11.x and 12.x |
+| **Laravel Framework** | `^11.0 \| ^12.0 \| ^13.0` | Verified on Laravel 11.x, 12.x, and 13.x |
 | **Database Engines** | SQLite 3, MySQL 8.0+, MariaDB 11.4+, PostgreSQL 16+ | Integration tested via automated CI containers |
-| **Laravel 13** | Planned for `v2.0.0` | Laravel 13 dropped PHP 8.2 support (requiring PHP ^8.3), decoupled Symfony Console 8 command exit constants, and tightened schema metadata docblocks. To preserve strict SemVer stability and PHP 8.2 support for 1.x installations, full Laravel 13 support will be released in major version 2.0.0. |
+| **Laravel 13** | Fully Supported | Verified in fresh application integration harness (requires PHP ^8.3+) |
 
 ### 🛡️ Safety Boundaries & Unsupported Features
 
