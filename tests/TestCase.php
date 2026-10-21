@@ -39,6 +39,14 @@ class TestCase extends Orchestra
     protected function tearDown(): void
     {
         $this->cleanDatabase();
+
+        foreach (['mysql', 'pgsql', 'source', 'testing'] as $conn) {
+            try {
+                DB::disconnect($conn);
+            } catch (\Throwable) {
+            }
+        }
+
         parent::tearDown();
     }
 

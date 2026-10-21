@@ -289,7 +289,11 @@ class SchemaSnapshotManager
                         $col = $table->{$method}($colName);
                     }
 
-                    if (! empty($column['unsigned']) && method_exists($col, 'unsigned')) {
+                    $isUnsigned = ! empty($column['unsigned'])
+                        || str_contains(strtolower((string) ($column['type'] ?? '')), 'unsigned')
+                        || str_contains(strtolower($typeName), 'unsigned');
+
+                    if ($isUnsigned && method_exists($col, 'unsigned')) {
                         $col->unsigned();
                     }
 
