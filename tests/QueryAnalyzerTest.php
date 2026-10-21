@@ -53,8 +53,48 @@ class QueryAnalyzerTest extends TestCase
     public function test_it_rejects_modifying_queries(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unsafe query rejected');
+        $this->expectExceptionMessage('Unsafe');
         $this->analyzer->analyze('DELETE FROM users WHERE id = 1');
+    }
+
+    public function test_it_rejects_modifying_ctes(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe modifying keyword [DELETE]');
+        $this->analyzer->analyze('WITH deleted AS (DELETE FROM users WHERE id = 1 RETURNING *) SELECT * FROM deleted');
+    }
+
+    public function test_it_rejects_comments_masking_modifications(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe');
+        $this->analyzer->analyze('/* SELECT */ DROP TABLE users');
+    }
+
+    public function test_it_rejects_line_comment_masking(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe');
+        $this->analyzer->analyze("-- SELECT\nUPDATE users SET email = 'hacked@test.com'");
+    }
+
+    public function test_it_allows_semicolons_inside_string_literals(): void
+    {
+        $result = $this->analyzer->analyze("SELECT * FROM users WHERE nickname = 'hello; world'");
+        $this->assertNotEmpty($result['rows']);
+    }
+
+    public function test_it_allows_modifying_words_inside_string_literals(): void
+    {
+        $result = $this->analyzer->analyze("SELECT * FROM users WHERE nickname = 'DELETED'");
+        $this->assertNotEmpty($result['rows']);
+    }
+
+    public function test_it_supports_read_only_ctes(): void
+    {
+        $query = 'WITH active_users AS (SELECT * FROM users WHERE email IS NOT NULL) SELECT * FROM active_users';
+        $result = $this->analyzer->analyze($query);
+        $this->assertNotEmpty($result['rows']);
     }
 
     public function test_it_rejects_multiple_statements(): void

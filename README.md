@@ -10,13 +10,16 @@
 
 ## 📋 Compatibility Matrix
 
-- **PHP**: `^8.2` (Verified on PHP 8.2, 8.3, 8.4, and 8.5)
+- **PHP**: `^8.2` (Verified across PHP 8.2, 8.3, 8.4, and 8.5)
 - **Framework**: Laravel `11.x` and `12.x`
 - **Supported Databases**:
   - SQLite (3.35+)
   - MySQL (8.0+)
   - MariaDB (10.6+)
   - PostgreSQL (14+)
+
+> [!NOTE]
+> **Laravel 13 Support Statement**: Laravel 13 dropped PHP 8.2 support (requiring PHP 8.3+) and introduced substantial breaking shifts in console command contracts and DBAL schema metadata representations. In accordance with Semantic Versioning (SemVer), official Laravel 13 support will be released in the upcoming 2.0 major version to preserve PHP 8.2 compatibility for 1.x installations.
 
 ---
 

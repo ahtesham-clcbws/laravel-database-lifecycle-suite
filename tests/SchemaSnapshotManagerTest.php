@@ -36,6 +36,8 @@ class SchemaSnapshotManagerTest extends TestCase
     {
         Schema::dropIfExists('users');
         Schema::dropIfExists('new_table');
+        Schema::dropIfExists('accounts');
+        Schema::dropIfExists('restored_accounts');
 
         if (is_dir($this->snapshotPath)) {
             $files = glob($this->snapshotPath.'/*.json');
@@ -96,5 +98,57 @@ class SchemaSnapshotManagerTest extends TestCase
 
         // Correct key is 'type'
         $this->assertEquals('text', $diff['table_changes']['users']['column_changes']['name']['type']['to']);
+    }
+
+    public function test_round_trip_schema_restoration_preserves_non_incrementing_pk_and_columns(): void
+    {
+        Schema::create('accounts', function (Blueprint $table) {
+            $table->string('code', 32)->primary();
+            $table->decimal('balance', 10, 2)->default(0.00);
+            $table->text('notes')->nullable();
+        });
+
+        $this->manager->capture('accounts_snap', $this->snapshotPath);
+        $snapshot = $this->manager->load('accounts_snap', $this->snapshotPath);
+
+        $accountsDef = $snapshot['tables']['accounts'];
+        $this->assertNotEmpty($accountsDef);
+
+        // String PK must NOT be marked auto_increment
+        $colMap = [];
+        foreach ($accountsDef['columns'] as $c) {
+            $colMap[$c['name']] = $c;
+        }
+        $this->assertFalse(! empty($colMap['code']['auto_increment']));
+
+        // Restore into 'restored_accounts'
+        $restored = $this->manager->restoreTable('restored_accounts', $accountsDef);
+        $this->assertTrue($restored);
+
+        $this->assertTrue(Schema::hasTable('restored_accounts'));
+        $this->assertTrue(Schema::hasColumn('restored_accounts', 'code'));
+        $this->assertTrue(Schema::hasColumn('restored_accounts', 'balance'));
+        $this->assertTrue(Schema::hasColumn('restored_accounts', 'notes'));
+    }
+
+    public function test_restore_table_preserves_explicit_non_incrementing_integer_primary_key(): void
+    {
+        $definition = [
+            'columns' => [
+                ['name' => 'external_id', 'type_name' => 'integer', 'nullable' => false, 'default' => null, 'auto_increment' => false],
+                ['name' => 'name', 'type_name' => 'varchar', 'nullable' => false, 'default' => null],
+            ],
+            'indexes' => [
+                ['name' => 'pk', 'columns' => ['external_id'], 'primary' => true, 'unique' => true],
+            ],
+            'foreign_keys' => [],
+        ];
+
+        $restored = $this->manager->restoreTable('non_inc_table', $definition);
+        $this->assertTrue($restored);
+        $this->assertTrue(Schema::hasTable('non_inc_table'));
+        $this->assertTrue(Schema::hasColumn('non_inc_table', 'external_id'));
+
+        Schema::dropIfExists('non_inc_table');
     }
 }

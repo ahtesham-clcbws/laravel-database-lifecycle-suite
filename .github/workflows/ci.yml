@@ -28,18 +28,140 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: mbstring, pdo, sqlite3, pdo_sqlite, pdo_mysql, pdo_pgsql, json
+          extensions: mbstring, pdo, sqlite3, pdo_sqlite, json
           coverage: none
 
       - name: Install Dependencies
         run: |
-          composer require "illuminate/support:${{ matrix.laravel }}" "illuminate/database:${{ matrix.laravel }}" "illuminate/console:${{ matrix.laravel }}" --no-interaction --no-update
-          composer update --prefer-stable --prefer-dist --no-interaction
+          composer config -g policy.advisories.block false || true
+          if [ "${{ matrix.laravel }}" = "11.*" ]; then
+            composer require "orchestra/testbench:^9.0" "illuminate/support:11.*" "illuminate/database:11.*" "illuminate/console:11.*" --no-interaction --no-update
+          else
+            composer require "orchestra/testbench:^10.0" "illuminate/support:12.*" "illuminate/database:12.*" "illuminate/console:12.*" --no-interaction --no-update
+          fi
+          composer update --prefer-stable --prefer-dist --no-interaction --no-audit
 
       - name: Validate Composer
         run: composer validate --strict --no-check-lock
 
       - name: Execute Tests
+        run: vendor/bin/phpunit
+
+  mysql-integration:
+    name: MySQL Integration
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: lifecycle_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo, pdo_mysql, json
+          coverage: none
+
+      - name: Install Dependencies
+        run: |
+          composer config -g policy.advisories.block false || true
+          composer update --prefer-dist --no-interaction --no-audit
+
+      - name: Execute Tests
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: lifecycle_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: vendor/bin/phpunit
+
+  mariadb-integration:
+    name: MariaDB Integration
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: lifecycle_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mariadb-admin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo, pdo_mysql, json
+          coverage: none
+
+      - name: Install Dependencies
+        run: |
+          composer config -g policy.advisories.block false || true
+          composer update --prefer-dist --no-interaction --no-audit
+
+      - name: Execute Tests
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: lifecycle_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: vendor/bin/phpunit
+
+  postgres-integration:
+    name: PostgreSQL Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: lifecycle_test
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo, pdo_pgsql, json
+          coverage: none
+
+      - name: Install Dependencies
+        run: |
+          composer config -g policy.advisories.block false || true
+          composer update --prefer-dist --no-interaction --no-audit
+
+      - name: Execute Tests
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: lifecycle_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: secret
         run: vendor/bin/phpunit
 
   code-quality:
@@ -57,7 +179,9 @@ jobs:
           coverage: none
 
       - name: Install Dependencies
-        run: composer update --prefer-dist --no-interaction
+        run: |
+          composer config -g policy.advisories.block false || true
+          composer update --prefer-dist --no-interaction --no-audit
 
       - name: Run Pint (Code Formatting)
         run: vendor/bin/pint --test

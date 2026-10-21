@@ -64,8 +64,9 @@ class DataDriftDetectorTest extends TestCase
 
         $drift = $this->detector->checkTable('products', 'source', 'testing');
 
-        $this->assertArrayHasKey('1', $drift['missing']);
-        $this->assertEquals('LAPTOP', $drift['missing']['1']['sku']);
+        $this->assertCount(1, $drift['missing']);
+        $firstMissing = reset($drift['missing']);
+        $this->assertEquals('LAPTOP', $firstMissing['sku']);
     }
 
     public function test_it_detects_differing_rows(): void
@@ -75,10 +76,11 @@ class DataDriftDetectorTest extends TestCase
 
         $drift = $this->detector->checkTable('products', 'source', 'testing');
 
-        $this->assertArrayHasKey('1', $drift['differing']);
-        $this->assertEquals(10, $drift['differing']['1']['source']['stock']);
-        $this->assertEquals(5, $drift['differing']['1']['live']['stock']);
-        $this->assertArrayHasKey('stock', $drift['differing']['1']['diff']);
+        $this->assertCount(1, $drift['differing']);
+        $firstDiff = reset($drift['differing']);
+        $this->assertEquals(10, $firstDiff['source']['stock']);
+        $this->assertEquals(5, $firstDiff['live']['stock']);
+        $this->assertArrayHasKey('stock', $firstDiff['diff']);
     }
 
     public function test_it_supports_composite_primary_keys(): void
@@ -90,7 +92,7 @@ class DataDriftDetectorTest extends TestCase
         ]);
 
         $drift = $this->detector->checkTable('role_permissions', 'source', 'testing');
-        $this->assertArrayHasKey('1:10', $drift['missing']);
+        $this->assertCount(1, $drift['missing']);
 
         // Sync composite key row
         $synced = $this->detector->syncRow('role_permissions', [
@@ -101,6 +103,63 @@ class DataDriftDetectorTest extends TestCase
 
         $this->assertTrue($synced);
         $this->assertDatabaseHas('role_permissions', ['role_id' => 1, 'permission_id' => 10], 'testing');
+    }
+
+    public function test_sync_row_detects_concurrent_modification_conflict(): void
+    {
+        DB::connection('source')->table('products')->insert(['id' => 50, 'sku' => 'PHONE', 'stock' => 100]);
+        DB::connection('testing')->table('products')->insert(['id' => 50, 'sku' => 'PHONE', 'stock' => 20]);
+
+        $drift = $this->detector->checkTable('products', 'source', 'testing');
+        $firstDiff = reset($drift['differing']);
+
+        // Concurrently update live row in testing database before sync runs
+        DB::connection('testing')->table('products')->where('id', 50)->update(['stock' => 35]);
+
+        // Attempt sync with the original live state expectation
+        $synced = $this->detector->syncRow(
+            'products',
+            $firstDiff['source'],
+            'testing',
+            ['id'],
+            $firstDiff['live']
+        );
+
+        // Must fail to sync because live state was modified concurrently
+        $this->assertFalse($synced);
+        $this->assertEquals(35, DB::connection('testing')->table('products')->where('id', 50)->value('stock'));
+    }
+
+    public function test_composite_keys_prevent_delimiter_collisions(): void
+    {
+        Schema::connection('testing')->create('composite_strings', function (Blueprint $table) {
+            $table->string('tenant');
+            $table->string('sub_id');
+            $table->string('payload');
+            $table->primary(['tenant', 'sub_id']);
+        });
+        Schema::connection('source')->create('composite_strings', function (Blueprint $table) {
+            $table->string('tenant');
+            $table->string('sub_id');
+            $table->string('payload');
+            $table->primary(['tenant', 'sub_id']);
+        });
+
+        // Insert colliding delimiter patterns: ("a:b", "c") vs ("a", "b:c")
+        DB::connection('source')->table('composite_strings')->insert([
+            ['tenant' => 'a:b', 'sub_id' => 'c', 'payload' => 'First'],
+            ['tenant' => 'a', 'sub_id' => 'b:c', 'payload' => 'Second'],
+        ]);
+
+        $drift = $this->detector->checkTable('composite_strings', 'source', 'testing');
+        $this->assertCount(2, $drift['missing']);
+
+        // Confirm both distinct keys exist in the missing map
+        $keys = array_keys($drift['missing']);
+        $this->assertCount(2, array_unique($keys));
+
+        Schema::connection('testing')->dropIfExists('composite_strings');
+        Schema::connection('source')->dropIfExists('composite_strings');
     }
 
     public function test_it_rejects_tables_without_primary_key(): void

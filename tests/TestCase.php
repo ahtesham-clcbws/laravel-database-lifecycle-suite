@@ -35,19 +35,61 @@ class TestCase extends Orchestra
      */
     protected function defineEnvironment($app): void
     {
-        // Use a shared memory database for SQLite to ensure visibility across Artisan commands
-        $app['config']->set('database.default', 'testing');
-        $app['config']->set('database.connections.testing', [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
-        ]);
+        $dbDriver = getenv('DB_CONNECTION');
 
-        $app['config']->set('database.connections.source', [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
-        ]);
+        if ($dbDriver === 'mysql') {
+            $app['config']->set('database.default', 'mysql');
+            $app['config']->set('database.connections.mysql', [
+                'driver' => 'mysql',
+                'host' => getenv('DB_HOST') ?: '127.0.0.1',
+                'port' => getenv('DB_PORT') ?: '3306',
+                'database' => getenv('DB_DATABASE') ?: 'lifecycle_test',
+                'username' => getenv('DB_USERNAME') ?: 'root',
+                'password' => getenv('DB_PASSWORD') ?: '',
+                'prefix' => '',
+            ]);
+            $app['config']->set('database.connections.source', [
+                'driver' => 'mysql',
+                'host' => getenv('DB_HOST') ?: '127.0.0.1',
+                'port' => getenv('DB_PORT') ?: '3306',
+                'database' => getenv('DB_DATABASE') ?: 'lifecycle_test',
+                'username' => getenv('DB_USERNAME') ?: 'root',
+                'password' => getenv('DB_PASSWORD') ?: '',
+                'prefix' => 'src_',
+            ]);
+        } elseif ($dbDriver === 'pgsql') {
+            $app['config']->set('database.default', 'pgsql');
+            $app['config']->set('database.connections.pgsql', [
+                'driver' => 'pgsql',
+                'host' => getenv('DB_HOST') ?: '127.0.0.1',
+                'port' => getenv('DB_PORT') ?: '5432',
+                'database' => getenv('DB_DATABASE') ?: 'lifecycle_test',
+                'username' => getenv('DB_USERNAME') ?: 'postgres',
+                'password' => getenv('DB_PASSWORD') ?: '',
+                'prefix' => '',
+            ]);
+            $app['config']->set('database.connections.source', [
+                'driver' => 'pgsql',
+                'host' => getenv('DB_HOST') ?: '127.0.0.1',
+                'port' => getenv('DB_PORT') ?: '5432',
+                'database' => getenv('DB_DATABASE') ?: 'lifecycle_test',
+                'username' => getenv('DB_USERNAME') ?: 'postgres',
+                'password' => getenv('DB_PASSWORD') ?: '',
+                'prefix' => 'src_',
+            ]);
+        } else {
+            $app['config']->set('database.default', 'testing');
+            $app['config']->set('database.connections.testing', [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+                'prefix' => '',
+            ]);
+            $app['config']->set('database.connections.source', [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+                'prefix' => '',
+            ]);
+        }
 
         $app['config']->set('database-lifecycle-suite.source_connection', 'source');
         $app['config']->set('database-lifecycle-suite.model_path', 'app/Models');

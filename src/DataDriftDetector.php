@@ -169,7 +169,8 @@ readonly class DataDriftDetector
         string $table,
         string|array $sourceOrData,
         mixed $arg3 = null,
-        mixed $arg4 = null
+        mixed $arg4 = null,
+        ?array $expectedDestinationState = null
     ): bool {
         if (is_array($sourceOrData)) {
             $data = $sourceOrData;
@@ -190,13 +191,31 @@ readonly class DataDriftDetector
         }
 
         try {
-            DB::connection($destination)->transaction(function () use ($table, $data, $destination, $primaryKeys) {
+            DB::connection($destination)->transaction(function () use (
+                $table,
+                $data,
+                $destination,
+                $primaryKeys,
+                $expectedDestinationState
+            ) {
                 $conditions = [];
                 foreach ($primaryKeys as $pk) {
                     if (! array_key_exists($pk, $data)) {
                         throw new InvalidArgumentException("Missing primary key column [{$pk}] in data to sync.");
                     }
                     $conditions[$pk] = $data[$pk];
+                }
+
+                // Optimistic concurrency verification: ensure destination row has not changed concurrently
+                if ($expectedDestinationState !== null) {
+                    $existing = DB::connection($destination)->table($table)->where($conditions)->first();
+                    if ($existing !== null) {
+                        $currentArray = (array) $existing;
+                        $conflicts = $this->compareRowValues($expectedDestinationState, $currentArray);
+                        if (! empty($conflicts)) {
+                            throw new \RuntimeException('Concurrent modification detected for row: destination state no longer matches drift baseline.');
+                        }
+                    }
                 }
 
                 DB::connection($destination)->table($table)->updateOrInsert($conditions, $data);
@@ -243,7 +262,7 @@ readonly class DataDriftDetector
 
             $results = DB::connection($connection)->table($table)->whereIn($pk, $ids)->get();
             foreach ($results as $result) {
-                $key = (string) $result->{$pk};
+                $key = $this->buildCompositeKey($result, $primaryKeys);
                 $mapped[$key] = (array) $result;
             }
         } else {
@@ -269,13 +288,9 @@ readonly class DataDriftDetector
 
     protected function buildCompositeKey(object|array $row, array $primaryKeys): string
     {
-        $parts = [];
-        $arr = (array) $row;
-        foreach ($primaryKeys as $pk) {
-            $parts[] = (string) ($arr[$pk] ?? '');
-        }
+        $values = $this->extractKeyValues($row, $primaryKeys);
 
-        return implode(':', $parts);
+        return json_encode($values, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: serialize($values);
     }
 
     protected function extractKeyValues(object|array $row, array $primaryKeys): array

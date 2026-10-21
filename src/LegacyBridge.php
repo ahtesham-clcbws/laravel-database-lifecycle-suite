@@ -39,8 +39,12 @@ class LegacyBridge
      * @param  string  $outputDir  Base directory for output files.
      * @return array Summary of generated files per table.
      */
-    public function reverseEngineer(array $tables, string $outputDir, ?string $connection = null): array
-    {
+    public function reverseEngineer(
+        array $tables,
+        string $outputDir,
+        ?string $connection = null,
+        bool $force = false
+    ): array {
         $results = [];
         $prefix = DB::connection($connection)->getTablePrefix();
 
@@ -61,10 +65,10 @@ class LegacyBridge
         foreach ($tables as $table) {
             $shortTable = $this->stripPrefix($table, $prefix);
             $results[$table] = [
-                'migration' => $this->generateMigration($table, $shortTable, $outputDir.'/migrations', $connection),
-                'model' => $this->generateModel($table, $shortTable, $outputDir.'/models', $connection),
-                'seeder' => $this->generateSeeder($table, $outputDir.'/seeders', $connection),
-                'factory' => $this->generateFactory($table, $shortTable, $outputDir.'/factories', $connection),
+                'migration' => $this->generateMigration($table, $shortTable, $outputDir.'/migrations', $connection, $force),
+                'model' => $this->generateModel($table, $shortTable, $outputDir.'/models', $connection, $force),
+                'seeder' => $this->generateSeeder($table, $outputDir.'/seeders', $connection, $force),
+                'factory' => $this->generateFactory($table, $shortTable, $outputDir.'/factories', $connection, $force),
             ];
         }
 
@@ -155,14 +159,24 @@ class LegacyBridge
     /**
      * Generate a Laravel Migration for a table, isolating foreign keys to prevent circular dependencies.
      */
-    protected function generateMigration(string $fullTable, string $shortTable, string $path, ?string $connection = null): string
-    {
+    protected function generateMigration(
+        string $fullTable,
+        string $shortTable,
+        string $path,
+        ?string $connection = null,
+        bool $force = false
+    ): string {
         $columns = Schema::connection($connection)->getColumns($fullTable);
         $indexes = Schema::connection($connection)->getIndexes($fullTable);
         $foreignKeys = Schema::connection($connection)->getForeignKeys($fullTable);
 
         $timestamp = date('Y_m_d_His');
         $fileName = $timestamp.'_create_'.$shortTable.'_table.php';
+
+        $fullFilePath = $path.'/'.$fileName;
+        if (file_exists($fullFilePath) && ! $force) {
+            return "Skipped (already exists): {$fileName}";
+        }
 
         $primaryKeys = [];
         foreach ($indexes as $index) {
@@ -237,13 +251,23 @@ class LegacyBridge
     /**
      * Generate a Laravel Model for a table with multi-connection support and collision-free relationships.
      */
-    protected function generateModel(string $fullTable, string $shortTable, string $path, ?string $connection = null): string
-    {
+    protected function generateModel(
+        string $fullTable,
+        string $shortTable,
+        string $path,
+        ?string $connection = null,
+        bool $force = false
+    ): string {
         if (in_array($fullTable, $this->pivots, true)) {
             return 'Skipped (Pivot table)';
         }
 
         $modelName = Str::studly(Str::singular($shortTable));
+        $fullFilePath = $path.'/'.$modelName.'.php';
+        if (file_exists($fullFilePath) && ! $force) {
+            return "Skipped (already exists): {$modelName}.php";
+        }
+
         $columns = Schema::connection($connection)->getColumnListing($fullTable);
         $indexes = Schema::connection($connection)->getIndexes($fullTable);
 
@@ -319,9 +343,18 @@ class LegacyBridge
     /**
      * Generate a safe Laravel Seeder scaffold (Never export live rows).
      */
-    protected function generateSeeder(string $table, string $path, ?string $connection = null): string
-    {
+    protected function generateSeeder(
+        string $table,
+        string $path,
+        ?string $connection = null,
+        bool $force = false
+    ): string {
         $seederName = Str::studly($table).'TableSeeder';
+        $fullFilePath = $path.'/'.$seederName.'.php';
+        if (file_exists($fullFilePath) && ! $force) {
+            return "Skipped (already exists): {$seederName}.php";
+        }
+
         $content = "<?php\n\nnamespace Database\\Seeders;\n\n";
         $content .= "use Illuminate\\Database\\Seeder;\n\n";
         $content .= "class {$seederName} extends Seeder\n{\n";
@@ -330,7 +363,6 @@ class LegacyBridge
         $content .= "        // Live database rows are intentionally not exported.\n";
         $content .= "    }\n}\n";
 
-        $fullFilePath = $path.'/'.$seederName.'.php';
         if (file_put_contents($fullFilePath, $content) === false) {
             throw new RuntimeException("Failed to write generated seeder: {$seederName}.php");
         }
@@ -341,13 +373,23 @@ class LegacyBridge
     /**
      * Generate a Laravel Factory for a table.
      */
-    protected function generateFactory(string $fullTable, string $shortTable, string $path, ?string $connection = null): string
-    {
+    protected function generateFactory(
+        string $fullTable,
+        string $shortTable,
+        string $path,
+        ?string $connection = null,
+        bool $force = false
+    ): string {
         if (in_array($fullTable, $this->pivots, true)) {
             return 'Skipped (Pivot table)';
         }
 
         $modelName = Str::studly(Str::singular($shortTable));
+        $fullFilePath = $path.'/'.$modelName.'Factory.php';
+        if (file_exists($fullFilePath) && ! $force) {
+            return "Skipped (already exists): {$modelName}Factory.php";
+        }
+
         $columns = Schema::connection($connection)->getColumns($fullTable);
 
         $content = "<?php\n\nnamespace Database\\Factories;\n\n";

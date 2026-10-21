@@ -65,4 +65,11 @@ class LifecycleStatusCommandTest extends TestCase
         $dataCheck = \collect($decoded['checks'])->firstWhere('aspect', 'Reference Data Consistency');
         $this->assertEquals('NOT CONFIGURED', $dataCheck['status']);
     }
+
+    public function test_it_rejects_invalid_format(): void
+    {
+        $this->artisan('db:lifecycle-status', ['--format' => 'xml'])
+            ->expectsOutputToContain('Invalid format [xml]')
+            ->assertExitCode(1);
+    }
 }

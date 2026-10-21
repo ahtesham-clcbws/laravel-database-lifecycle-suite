@@ -121,16 +121,39 @@ class SnapshotRestoreCommand extends Command
 
         // Production & Destructive Safeguards
         if ($recreate) {
-            $this->warn('!!! DESTRUCTIVE ACTION: --recreate will DROP existing tables and all their data permanently !!!');
+            if ($this->getLaravel()->environment('production')) {
+                $this->error('🚨 DESTRUCTIVE OPERATION BLOCKED: Dropping and recreating tables (--recreate) is strictly disabled in production environments.');
+                $this->line('   To restore in production, use non-destructive restoration or apply migrations manually after taking a verifiable backup.');
+
+                return self::FAILURE;
+            }
+
+            $this->warn('⚠️  DESTRUCTIVE ACTION: --recreate will permanently DROP existing tables and ALL their data.');
             if (! $this->confirmToProceed()) {
                 $this->info('Restore aborted.');
 
                 return self::FAILURE;
             }
-        } elseif (! $this->confirmAction($name)) {
-            $this->info('Restore aborted.');
+        } else {
+            // Non-destructive mode: check if all target tables already exist
+            $existingCount = 0;
+            foreach ($tables as $tableName => $def) {
+                if (Schema::connection($connection)->hasTable((string) $tableName)) {
+                    $existingCount++;
+                }
+            }
 
-            return self::SUCCESS;
+            if ($existingCount === count($tables)) {
+                $this->info("All tables in snapshot [{$name}] already exist in target database. Nothing to restore (non-destructive mode).");
+
+                return self::SUCCESS;
+            }
+
+            if (! $this->confirmAction($name)) {
+                $this->info('Restore aborted.');
+
+                return self::SUCCESS;
+            }
         }
 
         // Apply Schema Changes

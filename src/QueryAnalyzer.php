@@ -29,34 +29,9 @@ readonly class QueryAnalyzer
     {
         $driver = DB::connection($connection)->getDriverName();
 
-        // 1. Remove comments and extraneous whitespace
-        $cleanQuery = (string) preg_replace('!/\*.*?\*/!s', '', $query);
-        $cleanQuery = (string) preg_replace('/--.*$/m', '', $cleanQuery);
-        $cleanQuery = (string) preg_replace('/#.*$/m', '', $cleanQuery);
-        $cleanQuery = trim($cleanQuery);
+        $cleanQuery = $this->validateAndSanitizeQuery($query);
 
-        if ($cleanQuery === '') {
-            throw new InvalidArgumentException('Empty SQL query provided for analysis.');
-        }
-
-        // 2. Reject multiple statements (prevent SQL injection / chaining)
-        if (preg_match('/;(?!\s*$)/', $cleanQuery)) {
-            throw new InvalidArgumentException('Multiple SQL statements are strictly rejected for safety.');
-        }
-
-        // 3. Extract statement type and enforce read-only semantics
-        if (! preg_match('/^\s*([a-z]+)/i', $cleanQuery, $matches)) {
-            throw new InvalidArgumentException('Unable to determine query statement type.');
-        }
-
-        $queryType = strtoupper($matches[1]);
-        $allowedTypes = ['SELECT', 'WITH'];
-
-        if (! in_array($queryType, $allowedTypes, true)) {
-            throw new InvalidArgumentException('Unsafe query rejected. Only read-only SELECT and WITH statements are permitted for query plan analysis.');
-        }
-
-        // 4. Execute driver-appropriate EXPLAIN
+        // Execute driver-appropriate EXPLAIN
         try {
             $explainSql = match ($driver) {
                 'sqlite' => 'EXPLAIN QUERY PLAN '.$cleanQuery,
@@ -75,6 +50,61 @@ readonly class QueryAnalyzer
         } catch (Exception $e) {
             throw new Exception('Query plan analysis failed: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Validate and sanitize query ensuring strictly read-only execution.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function validateAndSanitizeQuery(string $query): string
+    {
+        // 1. Remove comments safely
+        $noComments = (string) preg_replace('!/\*.*?\*/!s', ' ', $query);
+        $noComments = (string) preg_replace('/(--|#).*$/m', ' ', $noComments);
+        $trimmed = trim($noComments);
+
+        if ($trimmed === '') {
+            throw new InvalidArgumentException('Empty SQL query provided for analysis.');
+        }
+
+        // 2. Normalize and mask string literals to prevent literal confusion
+        // Mask single-quoted literals: '...' (escaped as '' or \')
+        $masked = (string) preg_replace("/'(''|\\\\'|[^'])*'/", "'__STR__'", $trimmed);
+        // Mask double-quoted strings: "..."
+        $masked = (string) preg_replace('/"(""|\\\\"|[^"])*"/', '"__STR__"', $masked);
+
+        // 3. Reject multiple statements (semicolons outside string literals)
+        $strippedSemicolons = rtrim($masked, "; \t\n\r\0\x0B");
+        if (str_contains($strippedSemicolons, ';')) {
+            throw new InvalidArgumentException('Multiple SQL statements are strictly rejected for safety.');
+        }
+
+        // 4. Validate statement opening: strictly SELECT or read-only WITH
+        if (! preg_match('/^\s*([a-zA-Z]+)/', $masked, $matches)) {
+            throw new InvalidArgumentException('Unable to determine query statement type.');
+        }
+
+        $queryType = strtoupper($matches[1]);
+        if (! in_array($queryType, ['SELECT', 'WITH'], true)) {
+            throw new InvalidArgumentException("Unsafe statement type [{$queryType}]. Only read-only SELECT and WITH statements are permitted.");
+        }
+
+        // 5. Reject modifying DDL / DML keywords anywhere outside string literals
+        $modifyingKeywords = [
+            'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE',
+            'CREATE', 'REPLACE', 'MERGE', 'GRANT', 'REVOKE', 'LOCK',
+            'CALL', 'EXEC', 'EXECUTE',
+        ];
+
+        $pattern = '/\b('.implode('|', $modifyingKeywords).')\b/i';
+        if (preg_match($pattern, $masked, $keywordMatches)) {
+            $keyword = strtoupper($keywordMatches[1]);
+            throw new InvalidArgumentException("Unsafe modifying keyword [{$keyword}] detected. Modifying operations are strictly prohibited.");
+        }
+
+        // Return trimmed statement without trailing semicolon
+        return rtrim($trimmed, "; \t\n\r\0\x0B");
     }
 
     /**

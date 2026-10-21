@@ -152,6 +152,7 @@ readonly class SchemaSnapshotManager
             return $issues;
         }
 
+        $seenColumns = [];
         foreach ($definition['columns'] as $column) {
             if (! is_array($column) || ! isset($column['name'], $column['type_name'])) {
                 $issues[] = 'Malformed column metadata';
@@ -160,6 +161,10 @@ readonly class SchemaSnapshotManager
             }
 
             $colName = (string) $column['name'];
+            if (isset($seenColumns[$colName])) {
+                $issues[] = "Duplicate column definition detected for [{$colName}]";
+            }
+            $seenColumns[$colName] = true;
             if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $colName)) {
                 $issues[] = "Unsafe or invalid column identifier: [{$colName}]";
             }
@@ -212,10 +217,10 @@ readonly class SchemaSnapshotManager
                 foreach ($definition['columns'] as $column) {
                     $colName = (string) $column['name'];
                     $typeName = strtolower((string) $column['type_name']);
-                    $isSinglePk = count($primaryKeyColumns) === 1 && $primaryKeyColumns[0] === $colName;
                     $autoIncrement = ! empty($column['auto_increment']);
 
-                    if (($isSinglePk && str_contains($typeName, 'int')) || ($autoIncrement && str_contains($typeName, 'int'))) {
+                    // Only create incrementing columns when auto_increment is explicitly true
+                    if ($autoIncrement && str_contains($typeName, 'int')) {
                         $hasAutoIncrement = true;
                         if (str_contains($typeName, 'bigint')) {
                             $table->bigIncrements($colName);
@@ -233,7 +238,17 @@ readonly class SchemaSnapshotManager
                     }
 
                     $method = $this->mapType($typeName);
-                    $col = $table->{$method}($colName);
+                    if ($method === 'string' && ! empty($column['length'])) {
+                        $col = $table->string($colName, (int) $column['length']);
+                    } elseif ($method === 'decimal' && isset($column['precision'], $column['scale'])) {
+                        $col = $table->decimal($colName, (int) $column['precision'], (int) $column['scale']);
+                    } else {
+                        $col = $table->{$method}($colName);
+                    }
+
+                    if (! empty($column['unsigned']) && method_exists($col, 'unsigned')) {
+                        $col->unsigned();
+                    }
 
                     if (! empty($column['nullable'])) {
                         $col->nullable();

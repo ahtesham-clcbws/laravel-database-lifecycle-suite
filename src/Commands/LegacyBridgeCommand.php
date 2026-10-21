@@ -23,7 +23,8 @@ class LegacyBridgeCommand extends Command
      */
     protected $signature = 'db:legacy-bridge 
                             {--tables= : Comma-separated list of tables (defaults to all)} 
-                            {--database= : The database connection to use}';
+                            {--database= : The database connection to use}
+                            {--force : Overwrite existing generated artifact files}';
 
     /**
      * @var string
@@ -62,7 +63,8 @@ class LegacyBridgeCommand extends Command
             $outputDir = \base_path('legacy_bridge_output');
             $this->comment("Generating artifacts in: {$outputDir}...");
 
-            $summary = $bridge->reverseEngineer($tables, $outputDir, $connection);
+            $force = (bool) $this->option('force');
+            $summary = $bridge->reverseEngineer($tables, $outputDir, $connection, $force);
 
             // Output a clean summary table for the user
             $this->table(['Table', 'Migration', 'Model', 'Seeder', 'Factory'], array_map(function ($table, $files) {

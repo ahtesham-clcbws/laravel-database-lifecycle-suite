@@ -54,6 +54,12 @@ class LifecycleStatusCommand extends Command
         $format = strtolower((string) ($this->option('format') ?: 'table'));
         $strict = (bool) $this->option('strict');
 
+        if (! in_array($format, ['table', 'json'], true)) {
+            $this->error("Invalid format [{$format}]. Supported formats: table, json.");
+
+            return self::FAILURE;
+        }
+
         $isJson = $format === 'json';
         $targetConn = $connection ?: (string) \config('database.default', 'default');
         $modelPath = \base_path((string) \config('database-lifecycle-suite.model_path', 'app/Models'));

@@ -158,7 +158,7 @@ class DataDriftCommand extends Command
             }
 
             if ($this->confirm("Overwrite destination row [{$key}] with source data?", true)) {
-                if ($detector->syncRow($table, $diffData['source'], $connection, $pks)) {
+                if ($detector->syncRow($table, $diffData['source'], $connection, $pks, $diffData['live'])) {
                     $this->info(" + Updated row [{$key}]");
                     $synced++;
                 } else {
