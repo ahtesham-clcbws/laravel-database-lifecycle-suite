@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 class SnapshotCommandTest extends TestCase
 {
@@ -16,8 +15,8 @@ class SnapshotCommandTest extends TestCase
     {
         parent::setUp();
         $this->snapshotPath = \base_path('database/snapshots');
-        
-        if (!is_dir($this->snapshotPath)) {
+
+        if (! is_dir($this->snapshotPath)) {
             @mkdir($this->snapshotPath, 0755, true);
         }
 
@@ -29,7 +28,7 @@ class SnapshotCommandTest extends TestCase
     protected function tearDown(): void
     {
         if (is_dir($this->snapshotPath)) {
-            $files = glob($this->snapshotPath . '/*.json');
+            $files = glob($this->snapshotPath.'/*.json');
             foreach ($files as $file) {
                 @unlink($file);
             }
@@ -44,14 +43,14 @@ class SnapshotCommandTest extends TestCase
             ->expectsOutputToContain('Snapshot saved to')
             ->assertExitCode(0);
 
-        $this->assertFileExists($this->snapshotPath . '/test_cli.json');
+        $this->assertFileExists($this->snapshotPath.'/test_cli.json');
     }
 
     public function test_it_prevents_unintended_overwrites()
     {
         // Create first one manually
         @mkdir($this->snapshotPath, 0755, true);
-        file_put_contents($this->snapshotPath . '/exists.json', '{}');
+        file_put_contents($this->snapshotPath.'/exists.json', '{}');
 
         $this->artisan('db:snapshot', ['name' => 'exists'])
             ->expectsConfirmation('Snapshot [exists] already exists. Overwrite?', 'no')

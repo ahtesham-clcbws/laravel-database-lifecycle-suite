@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Commands;
 
-use Illuminate\Console\Command;
 use Clcbws\DatabaseLifecycleSuite\SoftDeleteAuditor;
+use Illuminate\Console\Command;
 
 /**
  * Class SoftDeleteAuditCommand
- * 
- * Artisan command to identify mismatches between Eloquent SoftDeletes trait 
+ *
+ * Artisan command to identify mismatches between Eloquent SoftDeletes trait
  * and database 'deleted_at' columns.
  */
 class SoftDeleteAuditCommand extends Command
@@ -20,7 +20,8 @@ class SoftDeleteAuditCommand extends Command
      */
     protected $signature = 'db:soft-delete-audit 
                             {--path=app/Models : Path to models directory} 
-                            {--database= : The database connection to use}';
+                            {--database= : The database connection to use}
+                            {--strict : Return a non-zero exit code if soft delete mismatches are found}';
 
     /**
      * @var string
@@ -29,30 +30,33 @@ class SoftDeleteAuditCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param SoftDeleteAuditor $auditor
-     * @return int
      */
     public function handle(SoftDeleteAuditor $auditor): int
     {
-        $path = \base_path($this->option('path'));
+        $optPath = (string) $this->option('path');
+        $path = str_starts_with($optPath, '/') ? $optPath : \base_path($optPath);
         $connection = $this->option('database');
-        
-        $this->info("🔍 Auditing Soft Delete consistency" . ($connection ? " in [{$connection}]" : "") . "...");
+
+        $this->info('🔍 Auditing Soft Delete consistency'.($connection ? " in [{$connection}]" : '').'...');
 
         $inconsistencies = $auditor->audit($path, $connection);
 
         if (empty($inconsistencies)) {
             $this->info('✅ All models and tables are consistent regarding Soft Deletes.');
-            return 0;
+
+            return self::SUCCESS;
         }
 
-        $this->warn('⚠️ Found ' . count($inconsistencies) . ' inconsistencies:');
+        $this->warn('⚠️ Found '.count($inconsistencies).' inconsistencies:');
 
         $this->table(['Model', 'Table', 'Issue'], array_map(function ($i) {
             return [$i['model'], $i['table'], $i['issue']];
         }, $inconsistencies));
 
-        return 0;
+        if ($this->option('strict')) {
+            return self::FAILURE;
+        }
+
+        return self::SUCCESS;
     }
 }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Commands;
 
-use Illuminate\Console\Command;
 use Clcbws\DatabaseLifecycleSuite\ConnectionHealthChecker;
+use Illuminate\Console\Command;
 
 /**
  * Class ConnectionCheckCommand
- * 
+ *
  * Artisan command to verify connectivity to all configured database connections.
  */
 class ConnectionCheckCommand extends Command
@@ -26,9 +26,6 @@ class ConnectionCheckCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param ConnectionHealthChecker $checker
-     * @return int
      */
     public function handle(ConnectionHealthChecker $checker): int
     {

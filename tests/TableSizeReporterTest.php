@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
 use Clcbws\DatabaseLifecycleSuite\TableSizeReporter;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 class TableSizeReporterTest extends TestCase
 {
@@ -15,7 +15,7 @@ class TableSizeReporterTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->reporter = new TableSizeReporter();
+        $this->reporter = new TableSizeReporter;
 
         Schema::create('logs', function (Blueprint $table) {
             $table->id();

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
 use Clcbws\DatabaseLifecycleSuite\PiiScanner;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 class PiiScannerTest extends TestCase
 {
@@ -15,7 +15,7 @@ class PiiScannerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->scanner = new PiiScanner();
+        $this->scanner = new PiiScanner;
 
         config(['database-lifecycle-suite.pii_patterns' => [
             'email' => '/email/i',
@@ -35,7 +35,7 @@ class PiiScannerTest extends TestCase
         $findings = $this->scanner->scan();
 
         $this->assertCount(2, $findings);
-        
+
         $emails = \collect($findings)->where('category', 'Email');
         $this->assertCount(1, $emails);
         $this->assertEquals('customer_email', $emails->first()['column']);
@@ -43,5 +43,12 @@ class PiiScannerTest extends TestCase
         $phones = \collect($findings)->where('category', 'Phone');
         $this->assertCount(1, $phones);
         $this->assertEquals('mobile_number', $phones->first()['column']);
+    }
+
+    public function test_pii_scan_command_respects_strict_flag(): void
+    {
+        $this->artisan('db:pii-scan', ['--strict' => true])
+            ->expectsOutputToContain('potential sensitive columns')
+            ->assertExitCode(1);
     }
 }

@@ -1,27 +1,31 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     /*
     |--------------------------------------------------------------------------
     | Index Naming Standards
     |--------------------------------------------------------------------------
     |
-    | Define the naming convention for database indexes.
+    | Defines the standard naming pattern for database indexes.
+    | Placeholders: {table}, {column}, {type} (index or unique).
     | Default: {table}_{column}_{type}
     |
     */
-    'index_naming_pattern' => '{table}_{column}_{type}',
+    'index_naming_pattern' => env('DB_LIFECYCLE_INDEX_PATTERN', '{table}_{column}_{type}'),
 
     /*
     |--------------------------------------------------------------------------
     | Data Drift Auditing
     |--------------------------------------------------------------------------
     |
-    | Define which tables should be audited for data drift and the source
-    | connection to compare against.
+    | Define which reference tables should be audited for data drift and the
+    | source of truth connection to compare against.
     |
     */
-    'source_connection' => 'production',
+    'source_connection' => env('DB_LIFECYCLE_SOURCE_CONNECTION', 'production'),
+
     'data_audit_tables' => [
         // 'roles',
         // 'permissions',
@@ -33,17 +37,18 @@ return [
     | Model Directory Path
     |--------------------------------------------------------------------------
     |
-    | Define where your Eloquent models are located for auditing.
+    | Defines where your Eloquent models are located for cast and soft-delete audits.
     |
     */
-    'model_path' => 'app/Models',
+    'model_path' => env('DB_LIFECYCLE_MODEL_PATH', 'app/Models'),
 
     /*
     |--------------------------------------------------------------------------
-    | PII Scanning Patterns
+    | Heuristic PII Scanning Patterns
     |--------------------------------------------------------------------------
     |
-    | Regular expressions used to identify potential PII columns.
+    | Regular expressions used to identify potential PII column names for
+    | compliance reporting (GDPR, CCPA). These are heuristic indicators only.
     |
     */
     'pii_patterns' => [

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
 use Clcbws\DatabaseLifecycleSuite\TableConventionAuditor;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 class TableConventionAuditorTest extends TestCase
 {
@@ -15,7 +15,7 @@ class TableConventionAuditorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->auditor = new TableConventionAuditor();
+        $this->auditor = new TableConventionAuditor;
     }
 
     public function test_it_detects_naming_convention_violations()
@@ -41,5 +41,16 @@ class TableConventionAuditorTest extends TestCase
 
         $standardViolations = \collect($violations)->where('table', 'blog_posts');
         $this->assertCount(0, $standardViolations);
+    }
+
+    public function test_convention_audit_command_respects_strict(): void
+    {
+        Schema::create('badConventionTable', function (Blueprint $table) {
+            $table->id();
+        });
+
+        $this->artisan('db:convention-audit', ['--strict' => true])
+            ->expectsOutputToContain('convention violations')
+            ->assertExitCode(1);
     }
 }

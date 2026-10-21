@@ -4,50 +4,64 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Commands;
 
-use Illuminate\Console\Command;
 use Clcbws\DatabaseLifecycleSuite\PiiScanner;
+use Illuminate\Console\Command;
 
 /**
  * Class PiiScanCommand
- * 
- * Artisan command to scan for potential PII.
+ *
+ * Artisan command to scan for potential PII using heuristic pattern matching.
  */
 class PiiScanCommand extends Command
 {
     /**
      * @var string
      */
-    protected $signature = 'db:pii-scan {--database= : The database connection to use}';
+    protected $signature = 'db:pii-scan 
+                            {--database= : The database connection to use}
+                            {--strict : Return a non-zero exit code if potential PII columns are found}';
 
     /**
      * @var string
      */
-    protected $description = 'Scan the database for columns that potentially contain PII (Sensitive Data)';
+    protected $description = 'Heuristically scan database columns for potential PII (Sensitive Data)';
 
     /**
      * Execute the console command.
-     *
-     * @param PiiScanner $scanner
-     * @return int
      */
     public function handle(PiiScanner $scanner): int
     {
         $connection = $this->option('database');
-        $this->info("🕵️  Scanning for potential PII" . ($connection ? " in [{$connection}]" : "") . "...");
+        $this->info('🕵️  Scanning for potential PII (Heuristic Name Matching)'.($connection ? " in [{$connection}]" : '').'...');
+        $this->line('   NOTE: Matches are heuristic indicators based on column names, not verified data content.');
 
         $findings = $scanner->scan($connection);
 
         if (empty($findings)) {
             $this->info('✅ No sensitive columns detected based on naming patterns.');
-            return 0;
+
+            return self::SUCCESS;
         }
 
-        $this->warn('⚠️  Found ' . count($findings) . ' potential sensitive columns:');
+        $this->warn('⚠️  Found '.count($findings).' potential sensitive columns:');
 
-        $this->table(['Table', 'Column', 'Category'], $findings);
+        $rows = array_map(function ($f) {
+            return [
+                $f['table'],
+                $f['column'],
+                $f['category'],
+                $f['confidence'],
+            ];
+        }, $findings);
 
-        $this->comment("\nTip: Ensure these columns are encrypted or handled according to GDPR/CCPA regulations.");
+        $this->table(['Table', 'Column', 'Category', 'Confidence'], $rows);
 
-        return 0;
+        $this->comment("\nTip: Ensure confirmed sensitive columns are encrypted or handled per GDPR/CCPA regulations.");
+
+        if ($this->option('strict')) {
+            return self::FAILURE;
+        }
+
+        return self::SUCCESS;
     }
 }

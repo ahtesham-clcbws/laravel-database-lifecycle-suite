@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
 use Clcbws\DatabaseLifecycleSuite\ConnectionHealthChecker;
-use Illuminate\Support\Facades\DB;
 
 class ConnectionHealthCheckerTest extends TestCase
 {
@@ -14,7 +13,7 @@ class ConnectionHealthCheckerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->checker = new ConnectionHealthChecker();
+        $this->checker = new ConnectionHealthChecker;
     }
 
     public function test_it_checks_connection_health()

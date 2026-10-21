@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use ReflectionClass;
 
 /**
  * Class CastAuditor
- * 
+ *
  * Verifies that Eloquent Model $casts match the actual database column types.
  * Helps identify runtime type mismatches and potential data corruption.
  */
@@ -18,27 +19,27 @@ readonly class CastAuditor
     /**
      * Audit model casts against DB column types.
      *
-     * @param string $modelPath Directory path where models are located.
-     * @param string|null $connection The database connection to use.
+     * @param  string  $modelPath  Directory path where models are located.
+     * @param  string|null  $connection  The database connection to use.
      * @return array List of detected cast mismatches.
      */
     public function audit(string $modelPath, ?string $connection = null): array
     {
         $mismatches = [];
-        
-        if (!is_dir($modelPath)) {
+
+        if (! is_dir($modelPath)) {
             return [];
         }
 
         $files = scandir($modelPath);
         foreach ($files as $file) {
-            if ($file === '.' || $file === '..' || !str_ends_with($file, '.php')) {
+            if ($file === '.' || $file === '..' || ! str_ends_with($file, '.php')) {
                 continue;
             }
 
-            $className = 'App\\Models\\' . str_replace('.php', '', $file);
-            
-            if (!class_exists($className)) {
+            $className = 'App\\Models\\'.str_replace('.php', '', $file);
+
+            if (! class_exists($className)) {
                 continue;
             }
 
@@ -49,27 +50,27 @@ readonly class CastAuditor
                 }
 
                 $instance = $reflection->newInstanceWithoutConstructor();
-                
-                if (!$instance instanceof \Illuminate\Database\Eloquent\Model) {
+
+                if (! $instance instanceof Model) {
                     continue;
                 }
 
                 $casts = $instance->getCasts();
                 $table = $instance->getTable();
 
-                if (!Schema::connection($connection)->hasTable($table)) {
+                if (! Schema::connection($connection)->hasTable($table)) {
                     continue;
                 }
 
                 $columns = \collect(Schema::connection($connection)->getColumns($table))->keyBy('name');
 
                 foreach ($casts as $column => $castType) {
-                    if (!$columns->has($column)) {
+                    if (! $columns->has($column)) {
                         continue;
                     }
 
                     $dbType = strtolower($columns[$column]['type_name']);
-                    if (!$this->isCastCompatible($castType, $dbType)) {
+                    if (! $this->isCastCompatible($castType, $dbType)) {
                         $mismatches[] = [
                             'model' => $className,
                             'column' => $column,
@@ -88,15 +89,11 @@ readonly class CastAuditor
 
     /**
      * Determine if a cast type is compatible with a database column type.
-     *
-     * @param string $cast
-     * @param string $dbType
-     * @return bool
      */
     protected function isCastCompatible(string $cast, string $dbType): bool
     {
         $cast = strtolower($cast);
-        
+
         return match ($cast) {
             'int', 'integer' => str_contains($dbType, 'int'),
             'bool', 'boolean' => str_contains($dbType, 'bool') || str_contains($dbType, 'tinyint(1)') || str_contains($dbType, 'bit'),

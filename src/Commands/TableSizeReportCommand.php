@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Commands;
 
-use Illuminate\Console\Command;
 use Clcbws\DatabaseLifecycleSuite\TableSizeReporter;
+use Illuminate\Console\Command;
 
 /**
  * Class TableSizeReportCommand
- * 
+ *
  * Artisan command to report physical table sizes and row counts.
  */
 class TableSizeReportCommand extends Command
@@ -26,14 +26,11 @@ class TableSizeReportCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param TableSizeReporter $reporter
-     * @return int
      */
     public function handle(TableSizeReporter $reporter): int
     {
         $connection = $this->option('database');
-        $this->info("📊 Generating table size report" . ($connection ? " for [{$connection}]" : "") . "...");
+        $this->info('📊 Generating table size report'.($connection ? " for [{$connection}]" : '').'...');
 
         try {
             $report = $reporter->getReport($connection);
@@ -41,6 +38,7 @@ class TableSizeReportCommand extends Command
             $this->table(['Table', 'Rows', 'Size (MB)'], $report);
         } catch (\Exception $e) {
             $this->error($e->getMessage());
+
             return 1;
         }
 

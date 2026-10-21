@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Commands;
 
-use Illuminate\Console\Command;
 use Clcbws\DatabaseLifecycleSuite\ColumnTypeAuditor;
+use Illuminate\Console\Command;
 
 /**
  * Class ColumnTypeAuditCommand
- * 
+ *
  * Artisan command to identify inconsistent column types across the database.
  */
 class ColumnTypeAuditCommand extends Command
@@ -17,7 +17,9 @@ class ColumnTypeAuditCommand extends Command
     /**
      * @var string
      */
-    protected $signature = 'db:column-type-audit {--database= : The database connection to use}';
+    protected $signature = 'db:column-type-audit 
+                            {--database= : The database connection to use}
+                            {--strict : Return a non-zero exit code if inconsistent column types are detected}';
 
     /**
      * @var string
@@ -26,23 +28,21 @@ class ColumnTypeAuditCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param ColumnTypeAuditor $auditor
-     * @return int
      */
     public function handle(ColumnTypeAuditor $auditor): int
     {
         $connection = $this->option('database');
-        $this->info("🔍 Auditing column type consistency" . ($connection ? " in [{$connection}]" : "") . "...");
+        $this->info('🔍 Auditing column type consistency'.($connection ? " in [{$connection}]" : '').'...');
 
         $inconsistencies = $auditor->audit($connection);
 
         if (empty($inconsistencies)) {
             $this->info('✅ No column type inconsistencies found.');
-            return 0;
+
+            return self::SUCCESS;
         }
 
-        $this->warn('⚠️ Found ' . count($inconsistencies) . ' inconsistent column types:');
+        $this->warn('⚠️ Found '.count($inconsistencies).' inconsistent column types:');
 
         foreach ($inconsistencies as $column => $usages) {
             $this->comment("\nColumn: {$column}");
@@ -51,6 +51,10 @@ class ColumnTypeAuditCommand extends Command
 
         $this->comment("\nTip: Inconsistent types (especially for FKs like user_id) can lead to unexpected database errors and JOIN failures.");
 
-        return 0;
+        if ($this->option('strict')) {
+            return self::FAILURE;
+        }
+
+        return self::SUCCESS;
     }
 }
