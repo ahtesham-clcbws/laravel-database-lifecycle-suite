@@ -7,4 +7,5 @@ phpunit.xml
 .phpunit.result.cache
 /legacy_bridge_output/
 /integration_test/
+/.workbench/
 *.code-workspace

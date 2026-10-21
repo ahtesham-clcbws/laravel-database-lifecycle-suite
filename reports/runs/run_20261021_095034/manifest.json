@@ -1,0 +1,23 @@
+{
+  "run_id": "run_20261021_095034",
+  "start_time": "2026-10-21 09:50:34 UTC",
+  "end_time": "2026-10-21 09:51:26 UTC",
+  "git": {
+    "commit": "7e513b09937a15ebe3574df31edaf240536206ca",
+    "branch": "development",
+    "worktree_clean": 0
+  },
+  "runtime": {
+    "php": "PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)",
+    "composer": "Composer version 2.10.3 2026-08-27 13:34:23"
+  },
+  "results": {
+    "composer_validate": "PASS",
+    "composer_audit": "PASS",
+    "pint": "PASS",
+    "phpstan": "PASS",
+    "phpunit_sqlite": "PASS",
+    "phpunit_pgsql": "PASS",
+    "app_integration": "PASS"
+  }
+}

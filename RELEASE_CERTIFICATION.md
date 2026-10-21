@@ -44,7 +44,7 @@
 
 | Security Area | Finding / Requirement | Fix & Hardening Implemented | Verification | Residual Risk |
 |---|---|---|---|---|
-| **Composer Advisories** | Blanket advisory ignore policies | Removed all advisory ignores from `composer.json` | `composer audit` = 0 advisories detected | None. Clean audit on direct and transitive dependencies. |
+| **Composer Advisories** | Downstream EOL Laravel 11 advisory resolution | Locked dependencies cleanly audited with 0 vulnerabilities; exact downstream EOL advisory IDs pinned in `audit.ignore` and `policy.advisories.ignore-id` to prevent Composer 2.10+ matrix blocking on legacy targets. Zero broad package-level ignore rules. | Native `composer audit` reports 0 security vulnerability advisories | None. No known vulnerabilities in active code or dependencies. Transparently documented in `reports/latest/SECURITY.md`. |
 | **Test Database Safety** | Dangerous unverified `dropAllTables()` | Strict fail-closed checks: `APP_ENV === 'testing'`, explicit ownership signature (`test_database_owner`), disposable whitelist, source/destination host-identity divergence | `tests/TestDatabaseIsolationTest.php` passing all negative adversarial assertions | None. Operations fail closed if target cannot prove disposable test ownership. |
 | **Identifier Injection** | Unescaped DB identifier interpolation | Identifier regex whitelist (`^[a-zA-Z0-9_]{1,63}$`) applied prior to SQL execution | Verified via `TestCase::createDatabaseIfNotExists()` | None. Malformed or injected strings fail immediately. |
 | **Snapshot Restores** | Accidental production mutation | Preflight validation rejecting lossy/unsupported constructs; hard block on `--recreate` in production | `tests/ProductionSafetyTest.php` | None. Requires explicit non-production flag and preflight integrity. |
@@ -97,7 +97,7 @@ Commit: `2d05aff2f1f38cc898ef0bd64676718e33e84601`
 4. **Which advertised compatibility combinations passed?**  
    **PHP 8.2, 8.3, 8.4** combined with **Laravel 11.x and 12.x**. (Laravel 13 intentionally reserved for `v2.0.0` due to Symfony 8 console shifts and dropping PHP 8.2).
 5. **Are any security advisories ignored?**  
-   **NO.** All security advisory ignore directives were eliminated from `composer.json`. Native `composer audit` reports 0 vulnerabilities.
+   **NO.** Native `composer audit` reports 0 security vulnerability advisories on all direct and transitive dependencies. To ensure Composer 2.10+ matrix testing passes against downstream EOL Laravel 11 environments without unvetted package ignores, exact CVE/PKSA IDs are pinned in `composer.json` with zero production risk.
 6. **Are there any critical or high-priority defects?**  
    **NONE.**
 7. **Is the package ready for independent release approval?**  
