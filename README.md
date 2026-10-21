@@ -274,6 +274,12 @@ Run static analysis (PHPStan):
 composer analyze
 ```
 
+Execute full offline local CI verification suite (Pint, PHPStan, Composer Audit, SQLite, and PostgreSQL):
+
+```bash
+composer test:ci
+```
+
 ---
 
 ## 📄 License

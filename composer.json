@@ -27,6 +27,7 @@
     },
     "scripts": {
         "test": "vendor/bin/phpunit",
+        "test:ci": "bash scripts/run-local-ci.sh",
         "lint": "vendor/bin/pint",
         "analyze": "vendor/bin/phpstan analyze"
     },

@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency Security**:
   - Eliminated broad package-level vulnerability exceptions (`ignore: ["laravel/framework"]`) in `composer.json`.
   - Pinned exact advisory IDs (`policy.advisories.ignore-id` and `audit.ignore`) for upstream EOL Laravel 11 matrix compatibility while enforcing continuous zero-trust `composer audit` and `composer validate --strict`.
+- **Local CI Verification Suite**:
+  - Added standalone `scripts/run-local-ci.sh` executable and `composer test:ci` shortcut enabling full local offline verification of Composer validation, security auditing, Pint styling, PHPStan static analysis, and multi-database test suites (SQLite and PostgreSQL).
+  - Added `VERIFICATION_REPORT.md` providing auditable, automated local test matrix execution artifacts.
 - **Seeder Security & File Overwrite Protection**:
   - Enforced safe seeder scaffolds in `LegacyBridge` with complete exclusion of live database records, credentials, and sensitive data.
   - Accidental file overwrite protection across migrations, models, seeders, and factories (requires explicit `--force` to replace existing artifacts).
