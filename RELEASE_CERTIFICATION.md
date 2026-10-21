@@ -2,9 +2,9 @@
 
 **Target Branch**: `development`  
 **Master Branch**: `master` (Untouched, 0 modifications, no merges performed)  
-**Starting / Final Head SHA**: `2d05aff2f1f38cc898ef0bd64676718e33e84601`  
+**Starting / Final Head SHA**: `8a5549a909bc12ae19e8d9380ce3afa2de559ded`  
 **Remote GitHub Actions Status**: Run [#39574634984](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39574634984) (10/10 Jobs Passed ✅)  
-**Local Test Suite**: 120 tests, 382 assertions passed (0 failures, 0 errors)
+**Local Test Suite**: 131 tests, 444 assertions passed (0 failures, 0 errors) across full matrix
 
 ---
 
@@ -33,10 +33,10 @@
 
 | Engine | Version | PHP | Laravel | Tests | Assertions | Failed | Skipped | Status | Log / Run Context |
 |---|---|---|---|---|---|---|---|---|---|
-| **SQLite** | 3.x (In-memory/File) | 8.5.11 | 12.x / 11.x | 120 | 382 | 0 | 0 | **PASS** | `scripts/run-local-ci.sh` |
-| **PostgreSQL** | 18.x (Local) & 16.x (CI) | 8.5.11 / 8.3 | 12.x | 120 | 382 | 0 | 0 | **PASS** | `tests/reports/phpunit_pgsql.log` & CI Job `119136985236` |
-| **MySQL** | 8.0 (Service Container) | 8.3 | 12.x | 120 | 382 | 0 | 0 | **PASS** | CI Job `119136985390` |
-| **MariaDB** | 10.11 (Service Container) | 8.3 | 12.x | 120 | 382 | 0 | 0 | **PASS** | CI Job `119136985439` |
+| **SQLite** | 3.x (In-memory/File) | 8.5.11 | 12.x / 11.x | 131 | 444 | 0 | 0 | **PASS** | `reports/runs/run_20261021_174514/phpunit_sqlite.log` |
+| **MySQL** | 8.4 (Isolated Container) | 8.5.11 | 12.x | 131 | 440 | 0 | 2 | **PASS** | `reports/runs/run_20261021_174514/phpunit_mysql.log` |
+| **MariaDB** | 13.0 (Isolated Service) | 8.5.11 | 12.x | 131 | 440 | 0 | 2 | **PASS** | `reports/runs/run_20261021_174514/phpunit_mariadb.log` |
+| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 12.x | 131 | 443 | 0 | 1 | **PASS** | `reports/runs/run_20261021_174514/phpunit_pgsql.log` |
 
 ---
 

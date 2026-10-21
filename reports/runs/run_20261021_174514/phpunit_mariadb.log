@@ -1,0 +1,13 @@
+PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.11
+Configuration: /mnt/BWS/public_projects/Laravel_database_lifecycle_suite/phpunit.xml
+
+..............................S................................  63 / 131 ( 48%)
+..............S................................................ 126 / 131 ( 96%)
+.....                                                           131 / 131 (100%)
+
+Time: 00:04.076, Memory: 16.00 MB
+
+OK, but some tests were skipped!
+Tests: 131, Assertions: 440, Skipped: 2.
