@@ -279,6 +279,11 @@ readonly class SchemaSnapshotManager
                         continue;
                     }
 
+                    // Internal SQLite auto-indexes for primary/unique constraints must not be recreated
+                    if ($indexName !== null && str_starts_with($indexName, 'sqlite_autoindex_')) {
+                        continue;
+                    }
+
                     if (! empty($index['unique'])) {
                         $table->unique($cols, $indexName);
                     } else {

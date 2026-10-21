@@ -28,6 +28,47 @@ class TestCase extends Orchestra
         ];
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->cleanDatabase();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->cleanDatabase();
+        parent::tearDown();
+    }
+
+    /**
+     * Wipe all tables on persistent multi-database test connections between test runs.
+     */
+    protected function cleanDatabase(): void
+    {
+        $defaultConn = (string) config('database.default', 'testing');
+        if (in_array($defaultConn, ['mysql', 'pgsql'], true)) {
+            try {
+                $tables = Schema::connection($defaultConn)->getTableListing();
+                Schema::connection($defaultConn)->disableForeignKeyConstraints();
+                foreach ($tables as $table) {
+                    Schema::connection($defaultConn)->dropIfExists($table);
+                }
+                Schema::connection($defaultConn)->enableForeignKeyConstraints();
+
+                if (config('database.connections.source')) {
+                    $srcTables = Schema::connection('source')->getTableListing();
+                    Schema::connection('source')->disableForeignKeyConstraints();
+                    foreach ($srcTables as $table) {
+                        Schema::connection('source')->dropIfExists($table);
+                    }
+                    Schema::connection('source')->enableForeignKeyConstraints();
+                }
+            } catch (\Throwable) {
+                // Ignore cleanup errors on fresh databases
+            }
+        }
+    }
+
     /**
      * Define the database environment for tests.
      *
