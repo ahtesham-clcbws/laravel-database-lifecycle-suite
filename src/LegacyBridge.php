@@ -497,7 +497,26 @@ class LegacyBridge
         }
 
         if (array_key_exists('default', $column) && $column['default'] !== null) {
-            $method .= '->default('.var_export($column['default'], true).')';
+            $rawDefault = $column['default'];
+            if (is_string($rawDefault)) {
+                // Strip database-specific SQL casts (e.g. Postgres '0'::numeric)
+                $cleanDefault = (string) preg_replace('/::[a-zA-Z0-9_\s]+$/', '', $rawDefault);
+                // Strip redundant surrounding single quotes from drivers like SQLite/Postgres
+                if (preg_match("/^'(.*)'$/s", $cleanDefault, $m)) {
+                    $cleanDefault = str_replace("''", "'", $m[1]);
+                }
+
+                if (is_numeric($cleanDefault)) {
+                    $parsedDefault = str_contains($cleanDefault, '.') ? (float) $cleanDefault : (int) $cleanDefault;
+                    $method .= '->default('.var_export($parsedDefault, true).')';
+                } elseif (strtoupper($cleanDefault) === 'NULL') {
+                    $method .= '->default(null)';
+                } else {
+                    $method .= '->default('.var_export($cleanDefault, true).')';
+                }
+            } else {
+                $method .= '->default('.var_export($rawDefault, true).')';
+            }
         }
 
         return ['statement' => $method, 'auto_increment' => false];

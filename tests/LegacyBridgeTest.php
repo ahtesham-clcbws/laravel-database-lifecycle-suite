@@ -67,6 +67,7 @@ class LegacyBridgeTest extends TestCase
         $this->assertStringContainsString("->references('id')->on('users')->onDelete('cascade')", $content);
         $this->assertStringContainsString("->references('id')->on('users')->onDelete('restrict')", $content);
         $this->assertStringContainsString("decimal('price')", $content);
+        $this->assertStringContainsString("->default(0)", $content);
     }
 
     public function test_it_generates_model_with_disambiguated_relationships(): void
