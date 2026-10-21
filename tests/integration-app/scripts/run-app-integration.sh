@@ -3,7 +3,7 @@
 # Laravel Database Lifecycle Suite - Parameterized Application Integration Runner
 # ==============================================================================
 # Usage:
-#   bash run-app-integration.sh [--laravel=11|12] [--all]
+#   bash run-app-integration.sh [--laravel=11|12|13|all] [--all]
 #
 # Orchestrates fresh Laravel installation in .workbench/laravel-<version>/,
 # installs local package source via path repository, seeds complex schemas,
@@ -30,6 +30,9 @@ for arg in "$@"; do
         --laravel=12)
             TARGET_VERSION="12"
             ;;
+        --laravel=13)
+            TARGET_VERSION="13"
+            ;;
         --laravel=all|--all)
             TARGET_VERSION="all"
             ;;
@@ -38,7 +41,7 @@ for arg in "$@"; do
             ;;
         *)
             echo "ERROR: Unknown argument: $arg" >&2
-            echo "Usage: $0 [--laravel=11|12|all] [--database=sqlite|mysql|mariadb|pgsql]" >&2
+            echo "Usage: $0 [--laravel=11|12|13|all] [--database=sqlite|mysql|mariadb|pgsql]" >&2
             exit 1
             ;;
     esac
@@ -75,6 +78,9 @@ run_version_integration() {
         composer install --no-interaction
         touch database/database.sqlite
         php artisan key:generate --ansi --force
+    elif [ "${LV}" = "13" ]; then
+        composer create-project --prefer-dist "laravel/laravel:^13.0" "${APP_DIR}" --no-interaction
+        cd "${APP_DIR}"
     else
         composer create-project --prefer-dist "laravel/laravel:^12.0" "${APP_DIR}" --no-interaction
         cd "${APP_DIR}"
@@ -273,6 +279,9 @@ run_version_integration() {
         composer install --no-interaction
         touch database/database.sqlite
         php artisan key:generate --ansi --force
+    elif [ "${LV}" = "13" ]; then
+        composer create-project --prefer-dist "laravel/laravel:^13.0" "${RECON_DIR}" --no-interaction
+        cd "${RECON_DIR}"
     else
         composer create-project --prefer-dist "laravel/laravel:^12.0" "${RECON_DIR}" --no-interaction
         cd "${RECON_DIR}"
@@ -451,6 +460,7 @@ run_version_integration() {
 if [ "${TARGET_VERSION}" = "all" ]; then
     run_version_integration "11"
     run_version_integration "12"
+    run_version_integration "13"
 else
     run_version_integration "${TARGET_VERSION}"
 fi

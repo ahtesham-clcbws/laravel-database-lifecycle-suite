@@ -24,16 +24,16 @@ for arg in "$@"; do
             echo "ERROR: Invalid database target: ${arg#*=}. Allowed: sqlite, mysql, mariadb, pgsql, all" >&2
             exit 1
             ;;
-        --laravel=11|--laravel=12|--laravel=all)
+        --laravel=11|--laravel=12|--laravel=13|--laravel=all)
             SELECTED_LV="${arg#*=}"
             ;;
         --laravel=*)
-            echo "ERROR: Invalid Laravel target: ${arg#*=}. Allowed: 11, 12, all" >&2
+            echo "ERROR: Invalid Laravel target: ${arg#*=}. Allowed: 11, 12, 13, all" >&2
             exit 1
             ;;
         *)
             echo "ERROR: Unknown argument: $arg" >&2
-            echo "Usage: $0 [--database=sqlite|mysql|mariadb|pgsql|all] [--laravel=11|12|all]" >&2
+            echo "Usage: $0 [--database=sqlite|mysql|mariadb|pgsql|all] [--laravel=11|12|13|all]" >&2
             exit 1
             ;;
     esac
@@ -57,6 +57,7 @@ PHPUNIT_MARIADB_STATUS="NOT_RUN"
 PHPUNIT_PGSQL_STATUS="NOT_RUN"
 APP_INTEGRATION_L11_STATUS="NOT_RUN"
 APP_INTEGRATION_L12_STATUS="NOT_RUN"
+APP_INTEGRATION_L13_STATUS="NOT_RUN"
 OVERALL_STATUS="RUNNING"
 
 PHP_VERSION=$(php -v | head -n 1)
@@ -82,6 +83,7 @@ write_manifest_and_summary() {
            [ "${PHPUNIT_SQLITE_STATUS}" = "FAIL" ] || [ "${PHPUNIT_MYSQL_STATUS}" = "FAIL" ] || \
            [ "${PHPUNIT_MARIADB_STATUS}" = "FAIL" ] || [ "${PHPUNIT_PGSQL_STATUS}" = "FAIL" ] || \
            [ "${APP_INTEGRATION_L11_STATUS}" = "FAIL" ] || [ "${APP_INTEGRATION_L12_STATUS}" = "FAIL" ] || \
+           [ "${APP_INTEGRATION_L13_STATUS}" = "FAIL" ] || \
            [ "${PHPUNIT_MYSQL_STATUS}" = "BLOCKED" ]; then
             OVERALL_STATUS="FAIL"
         else
@@ -116,7 +118,8 @@ write_manifest_and_summary() {
     "phpunit_mariadb": "${PHPUNIT_MARIADB_STATUS}",
     "phpunit_pgsql": "${PHPUNIT_PGSQL_STATUS}",
     "app_integration_laravel_11": "${APP_INTEGRATION_L11_STATUS}",
-    "app_integration_laravel_12": "${APP_INTEGRATION_L12_STATUS}"
+    "app_integration_laravel_12": "${APP_INTEGRATION_L12_STATUS}",
+    "app_integration_laravel_13": "${APP_INTEGRATION_L13_STATUS}"
   }
 }
 EOF
@@ -148,6 +151,7 @@ EOF
 | Integration Tests | PostgreSQL 18.6 Service | **${PHPUNIT_PGSQL_STATUS}** | phpunit_pgsql.log |
 | Application Integration | Laravel 11.x Full Matrix | **${APP_INTEGRATION_L11_STATUS}** | laravel11_integration.log |
 | Application Integration | Laravel 12.x Full Matrix | **${APP_INTEGRATION_L12_STATUS}** | laravel12_integration.log |
+| Application Integration | Laravel 13.x Full Matrix | **${APP_INTEGRATION_L13_STATUS}** | laravel13_integration.log |
 
 EOF
 
@@ -196,6 +200,7 @@ ${OVERALL_STATUS}
 - Integration (PostgreSQL 18.6): ${PHPUNIT_PGSQL_STATUS}
 - Laravel 11 Application: ${APP_INTEGRATION_L11_STATUS}
 - Laravel 12 Application: ${APP_INTEGRATION_L12_STATUS}
+- Laravel 13 Application: ${APP_INTEGRATION_L13_STATUS}
 - Dependency Audit: ${COMPOSER_AUDIT_STATUS}
 
 ### Final Certification Decision
@@ -444,6 +449,19 @@ if [ "${SELECTED_LV}" = "12" ] || [ "${SELECTED_LV}" = "all" ]; then
     else
         APP_INTEGRATION_L12_STATUS="FAIL"
         cat "${RUN_DIR}/laravel12_integration.log"
+        exit 1
+    fi
+fi
+
+if [ "${SELECTED_LV}" = "13" ] || [ "${SELECTED_LV}" = "all" ]; then
+    echo " -> Running Laravel 13 Integration Scenarios..."
+    APP_INTEGRATION_L13_STATUS="RUNNING"
+    if bash "${ROOT_DIR}/tests/integration-app/scripts/run-app-integration.sh" --laravel=13 > "${RUN_DIR}/laravel13_integration.log" 2>&1; then
+        APP_INTEGRATION_L13_STATUS="PASS"
+        cat "${RUN_DIR}/laravel13_integration.log"
+    else
+        APP_INTEGRATION_L13_STATUS="FAIL"
+        cat "${RUN_DIR}/laravel13_integration.log"
         exit 1
     fi
 fi
