@@ -4,37 +4,59 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite;
 
-use Illuminate\Support\Facades\Schema;
-use Clcbws\DatabaseLifecycleSuite\Traits\MapsDatabaseTypes;
 use Clcbws\DatabaseLifecycleSuite\Traits\FiltersTables;
+use Clcbws\DatabaseLifecycleSuite\Traits\MapsDatabaseTypes;
 use Exception;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 
 /**
  * Class SchemaSnapshotManager
- * 
- * Manages the persistence, loading, and comparison of database schema states.
+ *
+ * Manages the persistence, loading, comparison, and safe restoration of database schema states.
  */
 readonly class SchemaSnapshotManager
 {
-    use MapsDatabaseTypes, FiltersTables;
+    use FiltersTables, MapsDatabaseTypes;
+
+    public const SUPPORTED_VERSION = '1.0';
+
+    /**
+     * Validate that a snapshot name is safe and does not contain path traversal characters.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function validateSnapshotName(string $name): void
+    {
+        if (trim($name) === '' || ! preg_match('/^[a-zA-Z0-9_\-]+$/', $name)) {
+            throw new InvalidArgumentException("Invalid snapshot name: [{$name}]. Snapshot names may only contain alphanumeric characters, underscores, and dashes.");
+        }
+    }
 
     /**
      * Capture the current database schema into a JSON file.
+     *
+     * @throws Exception
      */
     public function capture(string $name, string $path, ?string $connection = null): string
     {
-        if (!is_dir($path)) {
-            if (!@mkdir($path, 0755, true) && !is_dir($path)) {
+        $this->validateSnapshotName($name);
+
+        if (! is_dir($path)) {
+            if (! @mkdir($path, 0755, true) && ! is_dir($path)) {
                 throw new Exception("Unable to create directory: {$path}. Check permissions.");
             }
         }
 
-        if (!is_writable($path)) {
+        if (! is_writable($path)) {
             throw new Exception("Directory is not writable: {$path}");
         }
 
         $schema = [
+            'version' => self::SUPPORTED_VERSION,
             'timestamp' => now()->toIso8601String(),
+            'connection' => $connection ?: 'default',
             'tables' => [],
         ];
 
@@ -50,7 +72,8 @@ readonly class SchemaSnapshotManager
         }
 
         $fullPath = "{$path}/{$name}.json";
-        if (file_put_contents($fullPath, json_encode($schema, JSON_PRETTY_PRINT)) === false) {
+        $encoded = json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($encoded === false || file_put_contents($fullPath, $encoded) === false) {
             throw new Exception("Failed to write snapshot to: {$fullPath}");
         }
 
@@ -58,17 +81,251 @@ readonly class SchemaSnapshotManager
     }
 
     /**
-     * Load a saved schema snapshot from disk.
+     * Load a saved schema snapshot from disk and validate its contents.
+     *
+     * @throws InvalidArgumentException|Exception
      */
     public function load(string $name, string $path): array
     {
+        $this->validateSnapshotName($name);
+
         $fullPath = "{$path}/{$name}.json";
 
-        if (!file_exists($fullPath)) {
+        if (! file_exists($fullPath)) {
             throw new Exception("Snapshot file not found: {$fullPath}");
         }
 
-        return json_decode((string) file_get_contents($fullPath), true);
+        $raw = file_get_contents($fullPath);
+        if ($raw === false || trim($raw) === '') {
+            throw new InvalidArgumentException("Snapshot file [{$name}] is empty.");
+        }
+
+        $data = json_decode($raw, true);
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($data)) {
+            throw new InvalidArgumentException("Malformed JSON in snapshot [{$name}]: ".json_last_error_msg());
+        }
+
+        $errors = $this->validateSnapshot($data);
+        if (! empty($errors)) {
+            throw new InvalidArgumentException("Invalid snapshot format in [{$name}]: ".implode('; ', $errors));
+        }
+
+        return $data;
+    }
+
+    /**
+     * Validate snapshot format and version metadata.
+     */
+    public function validateSnapshot(array $snapshot): array
+    {
+        $errors = [];
+
+        if (isset($snapshot['version']) && $snapshot['version'] !== self::SUPPORTED_VERSION) {
+            $errors[] = "Unsupported snapshot version [{$snapshot['version']}]. Supported version is [".self::SUPPORTED_VERSION.']';
+        }
+
+        if (! isset($snapshot['tables']) || ! is_array($snapshot['tables'])) {
+            $errors[] = "Missing or invalid 'tables' definition in snapshot";
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Validate whether a table definition can be restored without loss.
+     */
+    public function canRestoreWithoutLoss(array $definition): bool
+    {
+        return empty($this->getLossyFeatures($definition));
+    }
+
+    /**
+     * Inspect a table definition and return any unsupported or lossy schema features.
+     */
+    public function getLossyFeatures(array $definition): array
+    {
+        $issues = [];
+
+        if (! isset($definition['columns']) || ! is_array($definition['columns']) || empty($definition['columns'])) {
+            $issues[] = 'Missing or empty columns list';
+
+            return $issues;
+        }
+
+        foreach ($definition['columns'] as $column) {
+            if (! is_array($column) || ! isset($column['name'], $column['type_name'])) {
+                $issues[] = 'Malformed column metadata';
+
+                continue;
+            }
+
+            $colName = (string) $column['name'];
+            if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $colName)) {
+                $issues[] = "Unsafe or invalid column identifier: [{$colName}]";
+            }
+
+            $typeName = (string) $column['type_name'];
+            if (! $this->isSupportedDatabaseType($typeName)) {
+                $issues[] = "Unsupported column type [{$typeName}] on column [{$colName}]";
+            }
+        }
+
+        if (isset($definition['indexes']) && is_array($definition['indexes'])) {
+            foreach ($definition['indexes'] as $index) {
+                if (! is_array($index) || empty($index['columns']) || ! is_array($index['columns'])) {
+                    $issues[] = 'Malformed index metadata';
+                }
+            }
+        }
+
+        if (isset($definition['foreign_keys']) && is_array($definition['foreign_keys'])) {
+            foreach ($definition['foreign_keys'] as $fk) {
+                if (! is_array($fk) || empty($fk['foreign_table']) || empty($fk['columns']) || empty($fk['foreign_columns'])) {
+                    $issues[] = 'Malformed foreign key definition';
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Restore a table structure from a snapshot definition.
+     */
+    public function restoreTable(string $tableName, array $definition, ?string $connection = null): bool
+    {
+        if (! $this->canRestoreWithoutLoss($definition)) {
+            return false;
+        }
+
+        try {
+            Schema::connection($connection)->create($tableName, function (Blueprint $table) use ($definition) {
+                $primaryKeyColumns = [];
+                foreach ($definition['indexes'] ?? [] as $index) {
+                    if (! empty($index['primary'])) {
+                        $primaryKeyColumns = $index['columns'] ?? [];
+                        break;
+                    }
+                }
+
+                $hasAutoIncrement = false;
+                foreach ($definition['columns'] as $column) {
+                    $colName = (string) $column['name'];
+                    $typeName = strtolower((string) $column['type_name']);
+                    $isSinglePk = count($primaryKeyColumns) === 1 && $primaryKeyColumns[0] === $colName;
+                    $autoIncrement = ! empty($column['auto_increment']);
+
+                    if (($isSinglePk && str_contains($typeName, 'int')) || ($autoIncrement && str_contains($typeName, 'int'))) {
+                        $hasAutoIncrement = true;
+                        if (str_contains($typeName, 'bigint')) {
+                            $table->bigIncrements($colName);
+                        } elseif (str_contains($typeName, 'tinyint')) {
+                            $table->tinyIncrements($colName);
+                        } elseif (str_contains($typeName, 'smallint')) {
+                            $table->smallIncrements($colName);
+                        } elseif (str_contains($typeName, 'mediumint')) {
+                            $table->mediumIncrements($colName);
+                        } else {
+                            $table->increments($colName);
+                        }
+
+                        continue;
+                    }
+
+                    $method = $this->mapType($typeName);
+                    $col = $table->{$method}($colName);
+
+                    if (! empty($column['nullable'])) {
+                        $col->nullable();
+                    } else {
+                        $col->nullable(false);
+                    }
+
+                    if (array_key_exists('default', $column) && $column['default'] !== null) {
+                        $col->default($column['default']);
+                    }
+                }
+
+                // Explicit Composite Primary Key
+                if (count($primaryKeyColumns) > 1) {
+                    $table->primary($primaryKeyColumns);
+                } elseif (count($primaryKeyColumns) === 1 && ! $hasAutoIncrement) {
+                    $table->primary($primaryKeyColumns);
+                }
+
+                // Secondary Indexes & Unique Constraints
+                foreach ($definition['indexes'] ?? [] as $index) {
+                    if (! empty($index['primary'])) {
+                        continue;
+                    }
+                    $cols = (array) ($index['columns'] ?? []);
+                    $indexName = isset($index['name']) ? (string) $index['name'] : null;
+                    if (empty($cols)) {
+                        continue;
+                    }
+
+                    if (! empty($index['unique'])) {
+                        $table->unique($cols, $indexName);
+                    } else {
+                        $table->index($cols, $indexName);
+                    }
+                }
+            });
+
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Restore foreign keys for a table (executed in a second pass).
+     */
+    public function restoreForeignKeys(string $tableName, array $definition, ?string $connection = null): bool
+    {
+        $foreignKeys = $definition['foreign_keys'] ?? [];
+        if (empty($foreignKeys) || ! is_array($foreignKeys)) {
+            return true;
+        }
+
+        try {
+            Schema::connection($connection)->table($tableName, function (Blueprint $table) use ($foreignKeys) {
+                $allowedActions = ['cascade', 'restrict', 'set null', 'no action', 'set default'];
+
+                foreach ($foreignKeys as $fk) {
+                    $cols = (array) ($fk['columns'] ?? []);
+                    $foreignCols = (array) ($fk['foreign_columns'] ?? []);
+                    $foreignTable = (string) ($fk['foreign_table'] ?? '');
+                    $name = isset($fk['name']) ? (string) $fk['name'] : null;
+
+                    if (empty($cols) || empty($foreignCols) || $foreignTable === '') {
+                        continue;
+                    }
+
+                    $fkBlueprint = $table->foreign($cols, $name)
+                        ->references($foreignCols)
+                        ->on($foreignTable);
+
+                    if (! empty($fk['on_delete'])) {
+                        $action = strtolower((string) $fk['on_delete']);
+                        if (in_array($action, $allowedActions, true)) {
+                            $fkBlueprint->onDelete($action);
+                        }
+                    }
+
+                    if (! empty($fk['on_update'])) {
+                        $action = strtolower((string) $fk['on_update']);
+                        if (in_array($action, $allowedActions, true)) {
+                            $fkBlueprint->onUpdate($action);
+                        }
+                    }
+                }
+            });
+
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -82,17 +339,17 @@ readonly class SchemaSnapshotManager
             'table_changes' => [],
         ];
 
-        $baseTables = array_keys($base['tables']);
-        $newTables = array_keys($new['tables']);
+        $baseTables = array_keys($base['tables'] ?? []);
+        $newTables = array_keys($new['tables'] ?? []);
 
-        $diff['tables_added'] = array_diff($newTables, $baseTables);
-        $diff['tables_removed'] = array_diff($baseTables, $newTables);
+        $diff['tables_added'] = array_values(array_diff($newTables, $baseTables));
+        $diff['tables_removed'] = array_values(array_diff($baseTables, $newTables));
 
         $commonTables = array_intersect($baseTables, $newTables);
 
         foreach ($commonTables as $table) {
             $tableChanges = $this->compareTable($base['tables'][$table], $new['tables'][$table]);
-            if (!empty($tableChanges)) {
+            if (! empty($tableChanges)) {
                 $diff['table_changes'][$table] = $tableChanges;
             }
         }
@@ -105,85 +362,56 @@ readonly class SchemaSnapshotManager
         $changes = [];
 
         // Compare Columns
-        $baseCols = \collect($base['columns'])->keyBy('name');
-        $newCols = \collect($new['columns'])->keyBy('name');
+        $baseCols = \collect($base['columns'] ?? [])->keyBy('name');
+        $newCols = \collect($new['columns'] ?? [])->keyBy('name');
 
         $added = array_diff($newCols->keys()->toArray(), $baseCols->keys()->toArray());
         $removed = array_diff($baseCols->keys()->toArray(), $newCols->keys()->toArray());
 
-        if (!empty($added)) $changes['columns_added'] = $added;
-        if (!empty($removed)) $changes['columns_removed'] = $removed;
+        if (! empty($added)) {
+            $changes['columns_added'] = array_values($added);
+        }
+        if (! empty($removed)) {
+            $changes['columns_removed'] = array_values($removed);
+        }
 
         foreach (array_intersect($baseCols->keys()->toArray(), $newCols->keys()->toArray()) as $colName) {
             $baseCol = $baseCols[$colName];
             $newCol = $newCols[$colName];
-            
+
             $colChanges = [];
 
-            if ($baseCol['type_name'] !== $newCol['type_name']) {
-                $colChanges['type'] = ['from' => $baseCol['type_name'], 'to' => $newCol['type_name']];
+            if (($baseCol['type_name'] ?? null) !== ($newCol['type_name'] ?? null)) {
+                $colChanges['type'] = ['from' => $baseCol['type_name'] ?? null, 'to' => $newCol['type_name'] ?? null];
             }
 
-            if ($baseCol['nullable'] !== $newCol['nullable']) {
-                $colChanges['nullable'] = ['from' => $baseCol['nullable'], 'to' => $newCol['nullable']];
+            if (($baseCol['nullable'] ?? null) !== ($newCol['nullable'] ?? null)) {
+                $colChanges['nullable'] = ['from' => $baseCol['nullable'] ?? null, 'to' => $newCol['nullable'] ?? null];
             }
 
-            if ($baseCol['default'] !== $newCol['default']) {
-                $colChanges['default'] = ['from' => $baseCol['default'], 'to' => $newCol['default']];
+            if (($baseCol['default'] ?? null) !== ($newCol['default'] ?? null)) {
+                $colChanges['default'] = ['from' => $baseCol['default'] ?? null, 'to' => $newCol['default'] ?? null];
             }
 
-            if (!empty($colChanges)) {
+            if (! empty($colChanges)) {
                 $changes['column_changes'][$colName] = $colChanges;
             }
         }
 
+        // Compare Indexes
+        $baseIndexes = \collect($base['indexes'] ?? [])->keyBy('name');
+        $newIndexes = \collect($new['indexes'] ?? [])->keyBy('name');
+
+        $addedIndexes = array_diff($newIndexes->keys()->toArray(), $baseIndexes->keys()->toArray());
+        $removedIndexes = array_diff($baseIndexes->keys()->toArray(), $newIndexes->keys()->toArray());
+
+        if (! empty($addedIndexes)) {
+            $changes['indexes_added'] = array_values($addedIndexes);
+        }
+        if (! empty($removedIndexes)) {
+            $changes['indexes_removed'] = array_values($removedIndexes);
+        }
+
         return $changes;
-    }
-
-    /**
-     * Conservative preflight: reject features the current restorer cannot
-     * round-trip faithfully. An unsupported snapshot must not be applied.
-     */
-    public function canRestoreWithoutLoss(array $definition): bool
-    {
-        if (!isset($definition['columns']) || !is_array($definition['columns'])) {
-            return false;
-        }
-
-        if (!empty($definition['indexes']) || !empty($definition['foreign_keys'])) {
-            return false;
-        }
-
-        foreach ($definition['columns'] as $column) {
-            if (!is_array($column)
-                || !isset($column['name'], $column['type_name'], $column['nullable'])
-                || !is_string($column['name'])
-                || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $column['name'])
-                || !in_array(strtolower((string) $column['type_name']), ['text'], true)
-                || ($column['default'] ?? null) !== null
-                || !is_bool($column['nullable'])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * Restore a table from a snapshot definition.
-     */
-    public function restoreTable(string $tableName, array $definition, ?string $connection = null): bool
-    {
-        try {
-            Schema::connection($connection)->create($tableName, function ($table) use ($definition) {
-                foreach ($definition['columns'] as $column) {
-                    $type = $column['type_name'];
-                    $table->{$this->mapType($type)}($column['name'])->nullable($column['nullable']);
-                }
-            });
-            return true;
-        } catch (Exception $e) {
-            return false;
-        }
     }
 }
