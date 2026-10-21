@@ -293,7 +293,7 @@ class SchemaSnapshotManager
                         || str_contains(strtolower((string) ($column['type'] ?? '')), 'unsigned')
                         || str_contains(strtolower($typeName), 'unsigned');
 
-                    if ($isUnsigned && method_exists($col, 'unsigned')) {
+                    if ($isUnsigned) {
                         $col->unsigned();
                     }
 
