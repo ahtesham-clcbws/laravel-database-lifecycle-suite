@@ -1,6 +1,7 @@
 /vendor/
 .env
 .agent
+.agents
 composer.lock
 phpunit.xml
 .phpunit.result.cache
