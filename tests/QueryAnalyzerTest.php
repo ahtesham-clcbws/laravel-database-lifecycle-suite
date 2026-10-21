@@ -140,7 +140,18 @@ class QueryAnalyzerTest extends TestCase
 
     public function test_it_permits_backtick_quoted_identifiers(): void
     {
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'pgsql') {
+            $this->markTestSkipped('PostgreSQL uses standard double quotes for identifiers, not MySQL backticks.');
+        }
+
         $result = $this->analyzer->analyze('SELECT `id`, `email` FROM `users` WHERE `email` = \'test@example.com\'');
+        $this->assertNotEmpty($result['rows']);
+    }
+
+    public function test_it_permits_double_quoted_identifiers(): void
+    {
+        $result = $this->analyzer->analyze('SELECT "id", "email" FROM "users" WHERE "email" = \'test@example.com\'');
         $this->assertNotEmpty($result['rows']);
     }
 }
