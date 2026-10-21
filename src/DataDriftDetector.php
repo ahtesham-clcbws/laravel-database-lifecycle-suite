@@ -4,95 +4,204 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite;
 
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Exception;
+use InvalidArgumentException;
 
 /**
  * Class DataDriftDetector
- * 
+ *
  * Compares data between two database connections to identify discrepancies.
- * Automatically detects primary keys and uses chunking for memory safety on large tables.
+ * Supports single and composite primary keys, bounded memory safety,
+ * and deterministic column-level comparisons.
  */
 readonly class DataDriftDetector
 {
     /**
      * Check a specific table for data drift against a source connection.
      *
-     * @param string $table The table name to check.
-     * @param string $sourceConnection The name of the connection acting as the source of truth.
-     * @param string|null $liveConnection The local connection to compare.
-     * @param int $chunkSize Number of rows to process at once for memory safety.
-     * @return array Summary of detected discrepancies (missing, extra, differing).
+     * @param  string  $table  The table name to check.
+     * @param  string  $sourceConnection  The source of truth connection.
+     * @param  string|null  $liveConnection  The local/destination connection.
+     * @param  int  $chunkSize  Chunk size for iteration.
+     * @param  int  $maxDifferences  Maximum number of diffs to retain in memory.
+     * @return array Summary of detected discrepancies.
+     *
+     * @throws Exception
      */
-    public function checkTable(string $table, string $sourceConnection, ?string $liveConnection = null, int $chunkSize = 1000): array
-    {
+    public function checkTable(
+        string $table,
+        string $sourceConnection,
+        ?string $liveConnection = null,
+        int $chunkSize = 500,
+        int $maxDifferences = 1000
+    ): array {
         $liveConnection = $liveConnection ?: DB::getDefaultConnection();
-        $primaryKey = $this->getPrimaryKey($table, $liveConnection);
+
+        if (! Schema::connection($sourceConnection)->hasTable($table)) {
+            throw new InvalidArgumentException("Table [{$table}] does not exist on source connection [{$sourceConnection}].");
+        }
+
+        if (! Schema::connection($liveConnection)->hasTable($table)) {
+            throw new InvalidArgumentException("Table [{$table}] does not exist on destination connection [{$liveConnection}].");
+        }
+
+        $primaryKeys = $this->getPrimaryKeys($table, $sourceConnection);
+        if (empty($primaryKeys)) {
+            $primaryKeys = $this->getPrimaryKeys($table, $liveConnection);
+        }
+
+        if (empty($primaryKeys)) {
+            throw new Exception("Table [{$table}] lacks a primary key. Deterministic drift comparison requires a primary key.");
+        }
 
         $missing = [];
         $extra = [];
         $differing = [];
+        $truncated = false;
 
-        // Process source data in chunks to compare with live
-        DB::connection($sourceConnection)->table($table)->orderBy($primaryKey)->chunk($chunkSize, function ($rows) use (&$missing, &$differing, $liveConnection, $table, $primaryKey) {
-            $ids = $rows->pluck($primaryKey)->toArray();
-            $liveRows = DB::connection($liveConnection)->table($table)->whereIn($primaryKey, $ids)->get()->keyBy($primaryKey);
+        $sourceQuery = DB::connection($sourceConnection)->table($table);
+        foreach ($primaryKeys as $pk) {
+            $sourceQuery->orderBy($pk);
+        }
+
+        // Pass 1: Read source rows in chunks and compare with destination
+        $sourceQuery->chunk($chunkSize, function ($rows) use (
+            &$missing,
+            &$differing,
+            &$truncated,
+            $liveConnection,
+            $table,
+            $primaryKeys,
+            $maxDifferences
+        ) {
+            if ($truncated) {
+                return false;
+            }
+
+            $liveRows = $this->fetchMatchingRows($table, $liveConnection, $primaryKeys, $rows);
 
             foreach ($rows as $row) {
-                $id = $row->{$primaryKey};
+                $keyString = $this->buildCompositeKey($row, $primaryKeys);
+                $sourceArray = (array) $row;
 
-                if (!$liveRows->has($id)) {
-                    $missing[$id] = (array) $row;
-                } elseif ((array) $row != (array) $liveRows->get($id)) {
-                    $differing[$id] = [
-                        'source' => (array) $row,
-                        'live' => (array) $liveRows->get($id),
-                    ];
+                if (! isset($liveRows[$keyString])) {
+                    $missing[$keyString] = $sourceArray;
+                } else {
+                    $liveArray = $liveRows[$keyString];
+                    $colDiffs = $this->compareRowValues($sourceArray, $liveArray);
+                    if (! empty($colDiffs)) {
+                        $differing[$keyString] = [
+                            'key' => $this->extractKeyValues($row, $primaryKeys),
+                            'source' => $sourceArray,
+                            'live' => $liveArray,
+                            'diff' => $colDiffs,
+                        ];
+                    }
+                }
+
+                if ((count($missing) + count($differing)) >= $maxDifferences) {
+                    $truncated = true;
+
+                    return false;
                 }
             }
+
+            return true;
         });
 
-        // Find extra rows in live that don't exist in source
-        DB::connection($liveConnection)->table($table)->orderBy($primaryKey)->chunk($chunkSize, function ($rows) use (&$extra, $sourceConnection, $table, $primaryKey) {
-            $ids = $rows->pluck($primaryKey)->toArray();
-            $sourceRows = DB::connection($sourceConnection)->table($table)->whereIn($primaryKey, $ids)->get()->keyBy($primaryKey);
-
-            foreach ($rows as $row) {
-                $id = $row->{$primaryKey};
-                if (!$sourceRows->has($id)) {
-                    $extra[$id] = (array) $row;
-                }
+        // Pass 2: Check for destination-only extra rows (up to remaining quota)
+        if (! $truncated) {
+            $liveQuery = DB::connection($liveConnection)->table($table);
+            foreach ($primaryKeys as $pk) {
+                $liveQuery->orderBy($pk);
             }
-        });
+
+            $liveQuery->chunk($chunkSize, function ($rows) use (
+                &$extra,
+                &$truncated,
+                $sourceConnection,
+                $table,
+                $primaryKeys,
+                $missing,
+                $differing,
+                $maxDifferences
+            ) {
+                if ($truncated) {
+                    return false;
+                }
+
+                $sourceRows = $this->fetchMatchingRows($table, $sourceConnection, $primaryKeys, $rows);
+
+                foreach ($rows as $row) {
+                    $keyString = $this->buildCompositeKey($row, $primaryKeys);
+                    if (! isset($sourceRows[$keyString])) {
+                        $extra[$keyString] = (array) $row;
+                    }
+
+                    if ((count($missing) + count($differing) + count($extra)) >= $maxDifferences) {
+                        $truncated = true;
+
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+        }
 
         return [
-            'primary_key' => $primaryKey,
+            'primary_keys' => $primaryKeys,
             'missing' => $missing,
             'extra' => $extra,
             'differing' => $differing,
+            'truncated' => $truncated,
+            'max_differences' => $maxDifferences,
         ];
     }
 
     /**
-     * Sync a specific row from source to live database.
-     *
-     * @param string $table
-     * @param string $sourceConnection
-     * @param array $data
-     * @param string|null $liveConnection
-     * @return bool
+     * Safely sync a specific row from source to live database inside a transaction.
+     * Supports both new signature ($table, $data, $dest, $pks) and legacy ($table, $source, $data, $dest).
      */
-    public function syncRow(string $table, string $sourceConnection, array $data, ?string $liveConnection = null): bool
-    {
-        $liveConnection = $liveConnection ?: DB::getDefaultConnection();
-        $primaryKey = $this->getPrimaryKey($table, $liveConnection);
+    public function syncRow(
+        string $table,
+        string|array $sourceOrData,
+        mixed $arg3 = null,
+        mixed $arg4 = null
+    ): bool {
+        if (is_array($sourceOrData)) {
+            $data = $sourceOrData;
+            $destination = is_string($arg3) ? $arg3 : null;
+            $primaryKeys = is_array($arg4) ? $arg4 : (is_array($arg3) ? $arg3 : null);
+        } else {
+            // Legacy signature: syncRow($table, $sourceConnection, $data, $liveConnection)
+            $data = is_array($arg3) ? $arg3 : [];
+            $destination = is_string($arg4) ? $arg4 : null;
+            $primaryKeys = null;
+        }
+
+        $destination = $destination ?: DB::getDefaultConnection();
+        $primaryKeys = $primaryKeys ?: $this->getPrimaryKeys($table, $destination);
+
+        if (empty($primaryKeys)) {
+            return false;
+        }
 
         try {
-            DB::connection($liveConnection)->table($table)->updateOrInsert(
-                [$primaryKey => $data[$primaryKey]], 
-                $data
-            );
+            DB::connection($destination)->transaction(function () use ($table, $data, $destination, $primaryKeys) {
+                $conditions = [];
+                foreach ($primaryKeys as $pk) {
+                    if (! array_key_exists($pk, $data)) {
+                        throw new InvalidArgumentException("Missing primary key column [{$pk}] in data to sync.");
+                    }
+                    $conditions[$pk] = $data[$pk];
+                }
+
+                DB::connection($destination)->table($table)->updateOrInsert($conditions, $data);
+            });
+
             return true;
         } catch (Exception $e) {
             return false;
@@ -100,25 +209,107 @@ readonly class DataDriftDetector
     }
 
     /**
-     * Determine the primary key column for a table.
-     *
-     * @param string $table
-     * @param string $connection
-     * @return string
+     * Determine all primary key columns for a table.
      */
-    protected function getPrimaryKey(string $table, string $connection): string
+    public function getPrimaryKeys(string $table, string $connection): array
     {
         try {
             $indexes = Schema::connection($connection)->getIndexes($table);
             foreach ($indexes as $index) {
-                if ($index['primary']) {
-                    return $index['columns'][0];
+                if (! empty($index['primary'])) {
+                    return (array) $index['columns'];
                 }
             }
         } catch (Exception $e) {
-            // Default to id if lookup fails
+            // Ignore error and fallback
         }
-        
-        return 'id';
+
+        return [];
+    }
+
+    /**
+     * Fetch matching rows from a target connection using single or composite primary keys.
+     */
+    protected function fetchMatchingRows(string $table, string $connection, array $primaryKeys, iterable $rows): array
+    {
+        $mapped = [];
+
+        if (count($primaryKeys) === 1) {
+            $pk = $primaryKeys[0];
+            $ids = [];
+            foreach ($rows as $row) {
+                $ids[] = $row->{$pk};
+            }
+
+            $results = DB::connection($connection)->table($table)->whereIn($pk, $ids)->get();
+            foreach ($results as $result) {
+                $key = (string) $result->{$pk};
+                $mapped[$key] = (array) $result;
+            }
+        } else {
+            // Composite primary key matching
+            $results = DB::connection($connection)->table($table)->where(function ($query) use ($primaryKeys, $rows) {
+                foreach ($rows as $row) {
+                    $query->orWhere(function ($sub) use ($primaryKeys, $row) {
+                        foreach ($primaryKeys as $pk) {
+                            $sub->where($pk, $row->{$pk});
+                        }
+                    });
+                }
+            })->get();
+
+            foreach ($results as $result) {
+                $key = $this->buildCompositeKey($result, $primaryKeys);
+                $mapped[$key] = (array) $result;
+            }
+        }
+
+        return $mapped;
+    }
+
+    protected function buildCompositeKey(object|array $row, array $primaryKeys): string
+    {
+        $parts = [];
+        $arr = (array) $row;
+        foreach ($primaryKeys as $pk) {
+            $parts[] = (string) ($arr[$pk] ?? '');
+        }
+
+        return implode(':', $parts);
+    }
+
+    protected function extractKeyValues(object|array $row, array $primaryKeys): array
+    {
+        $values = [];
+        $arr = (array) $row;
+        foreach ($primaryKeys as $pk) {
+            $values[$pk] = $arr[$pk] ?? null;
+        }
+
+        return $values;
+    }
+
+    /**
+     * Compare two row arrays and return specific column differences.
+     */
+    protected function compareRowValues(array $source, array $live): array
+    {
+        $diffs = [];
+        $allKeys = array_unique(array_merge(array_keys($source), array_keys($live)));
+
+        foreach ($allKeys as $key) {
+            $srcVal = $source[$key] ?? null;
+            $liveVal = $live[$key] ?? null;
+
+            // Handle strict null comparison vs scalar representation
+            if ($srcVal !== $liveVal && (string) $srcVal !== (string) $liveVal) {
+                $diffs[$key] = [
+                    'source' => $srcVal,
+                    'live' => $liveVal,
+                ];
+            }
+        }
+
+        return $diffs;
     }
 }
