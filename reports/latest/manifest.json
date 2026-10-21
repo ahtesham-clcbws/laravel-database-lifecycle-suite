@@ -1,12 +1,13 @@
 {
-  "run_id": "run_20261021_105543",
-  "start_time": "2026-10-21 10:55:43 UTC",
-  "end_time": "2026-10-21 10:56:55 UTC",
+  "run_id": "run_20261021_121727",
+  "start_time": "2026-10-21 12:17:27 UTC",
+  "end_time": "2026-10-21 12:20:17 UTC",
+  "overall_status": "PASS",
   "git": {
-    "commit": "4209be16c9fe9ace62eb154e39a5662dddc962a4",
+    "commit": "3bb3c2e2b5f370d1f5b3920f7ce943fdfea79a00",
     "branch": "development",
     "worktree_clean": 1,
-    "commit_count": 39
+    "commit_count": 41
   },
   "runtime": {
     "php": "PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)",
@@ -18,8 +19,10 @@
     "pint": "PASS",
     "phpstan": "PASS",
     "phpunit_sqlite": "PASS",
-    "phpunit_pgsql": "PASS",
+    "phpunit_mysql": "PASS",
     "phpunit_mariadb": "PASS",
-    "app_integration": "PASS"
+    "phpunit_pgsql": "PASS",
+    "app_integration_laravel_11": "PASS",
+    "app_integration_laravel_12": "PASS"
   }
 }
