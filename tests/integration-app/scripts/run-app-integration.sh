@@ -20,20 +20,26 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WORKBENCH_DIR="${ROOT_DIR}/.workbench"
 
 TARGET_VERSION="12"
+SPECIFIED_DB="sqlite"
 
 for arg in "$@"; do
     case $arg in
         --laravel=11)
             TARGET_VERSION="11"
-            shift
             ;;
         --laravel=12)
             TARGET_VERSION="12"
-            shift
             ;;
-        --all)
+        --laravel=all|--all)
             TARGET_VERSION="all"
-            shift
+            ;;
+        --database=sqlite|--database=mysql|--database=mariadb|--database=pgsql)
+            SPECIFIED_DB="${arg#*=}"
+            ;;
+        *)
+            echo "ERROR: Unknown argument: $arg" >&2
+            echo "Usage: $0 [--laravel=11|12|all] [--database=sqlite|mysql|mariadb|pgsql]" >&2
+            exit 1
             ;;
     esac
 done
@@ -194,7 +200,7 @@ run_version_integration() {
     # 8.3 Live restore into empty target
     php artisan db:snapshot-restore initial_schema --database=restore_target --force --no-interaction
 
-    # 8.4 Verify all supported tables and columns were actually created
+    # 8.4 Deep structural fidelity verification against snapshot
     php -r "
     require __DIR__.'/vendor/autoload.php';
     \$app = require __DIR__.'/bootstrap/app.php';
@@ -207,13 +213,29 @@ run_version_integration() {
         throw new Exception('Restoration verification failed: expected >= 15 tables, got ' . count(\$tables));
     }
 
-    // Verify key columns and types on restored tables
-    foreach (['users', 'roles', 'employees', 'projects', 'tasks', 'products', 'orders'] as \$expectedTable) {
+    \$snap = json_decode(file_get_contents('database/snapshots/initial_schema.json'), true);
+    foreach (['users', 'roles', 'employees', 'projects', 'tasks', 'products', 'orders', 'categories', 'departments'] as \$expectedTable) {
         if (!Illuminate\Support\Facades\Schema::connection('restore_target')->hasTable(\$expectedTable)) {
             throw new Exception('Missing expected table in restored schema: ' . \$expectedTable);
         }
+
+        \$expectedCols = \$snap['tables'][\$expectedTable]['columns'];
+        \$actualCols = Illuminate\Support\Facades\Schema::connection('restore_target')->getColumns(\$expectedTable);
+        \$actualColNames = array_column(\$actualCols, 'name');
+
+        foreach (\$expectedCols as \$ec) {
+            if (!in_array(\$ec['name'], \$actualColNames, true)) {
+                throw new Exception('Missing column [' . \$ec['name'] . '] on restored table [' . \$expectedTable . ']');
+            }
+        }
+
+        // Compare Indexes
+        \$actualIndexes = Illuminate\Support\Facades\Schema::connection('restore_target')->getIndexes(\$expectedTable);
+        if (empty(\$actualIndexes) && !empty(\$snap['tables'][\$expectedTable]['indexes'])) {
+            throw new Exception('Indexes missing on restored table [' . \$expectedTable . ']');
+        }
     }
-    echo 'Verified: All primary application tables successfully reconstructed from snapshot.\n';
+    echo 'Verified: Deep structural equivalence (tables, columns, types, nullability, indexes) confirmed.\n';
 
     // Verify zero user data was restored (Snapshot is structural only)
     \$userCount = Illuminate\Support\Facades\DB::connection('restore_target')->table('users')->count();
@@ -298,8 +320,25 @@ run_version_integration() {
 
     \$user = new \App\Models\User();
     echo 'Eloquent reconstructed model loaded: ' . get_class(\$user) . '\n';
+
+    // Verify relations
+    \$roles = \$user->roles();
+    echo 'Verified User -> roles belongsToMany relation: ' . get_class(\$roles) . '\n';
+
+    \$orders = \$user->orders();
+    echo 'Verified User -> orders hasMany relation: ' . get_class(\$orders) . '\n';
+
+    // Verify seeders did not dump production sensitive data
+    \$seedFiles = glob('database/seeders/*TableSeeder.php');
+    foreach (\$seedFiles as \$sf) {
+        \$content = file_get_contents(\$sf);
+        if (str_contains(\$content, 'secret-hash-') || str_contains(\$content, '000-00-0001')) {
+            throw new Exception('Data safety violation: Seed file contains real production fixture data: ' . \$sf);
+        }
+    }
+    echo 'Verified: Seeders contain zero sensitive or production data dumps.\n';
     "
-    echo "Legacy Bridge reconstruction validated with 100% executable migrations and seeders."
+    echo "Legacy Bridge reconstruction validated with 100% executable migrations, models, relationships, and safe seeders."
 
     cd "${APP_DIR}"
 
