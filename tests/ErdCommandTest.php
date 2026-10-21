@@ -40,7 +40,8 @@ class ErdCommandTest extends TestCase
 
     public function test_it_generates_valid_mermaid_erd(): void
     {
-        $mermaid = $this->generator->generateMermaid('testing');
+        $conn = (string) config('database.default');
+        $mermaid = $this->generator->generateMermaid($conn);
 
         $this->assertStringStartsWith("erDiagram\n", $mermaid);
         $this->assertStringContainsString('authors {', $mermaid);
@@ -50,7 +51,8 @@ class ErdCommandTest extends TestCase
 
     public function test_it_executes_erd_artisan_command(): void
     {
-        Artisan::call('db:erd', ['--database' => 'testing']);
+        $conn = (string) config('database.default');
+        Artisan::call('db:erd', ['--database' => $conn]);
         $output = Artisan::output();
         $this->assertStringContainsString('erDiagram', $output);
         $this->assertStringContainsString('authors', $output);
@@ -60,10 +62,11 @@ class ErdCommandTest extends TestCase
     public function test_it_saves_mermaid_to_file(): void
     {
         $filePath = sys_get_temp_dir().'/test_erd_'.bin2hex(random_bytes(4)).'.mmd';
+        $conn = (string) config('database.default');
 
         try {
             Artisan::call('db:erd', [
-                '--database' => 'testing',
+                '--database' => $conn,
                 '--output' => $filePath,
             ]);
 

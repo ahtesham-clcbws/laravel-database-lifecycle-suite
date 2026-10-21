@@ -24,6 +24,11 @@ class IndexHealthAuditorTest extends TestCase
 
     public function test_it_detects_unindexed_foreign_keys()
     {
+        $driver = (string) config('database.default');
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            $this->markTestSkipped('MySQL/MariaDB automatically creates backing indexes for all foreign key constraints.');
+        }
+
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');

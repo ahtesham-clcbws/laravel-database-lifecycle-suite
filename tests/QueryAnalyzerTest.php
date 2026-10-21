@@ -6,6 +6,7 @@ namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
 use Clcbws\DatabaseLifecycleSuite\QueryAnalyzer;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
@@ -38,7 +39,7 @@ class QueryAnalyzerTest extends TestCase
         $this->assertArrayHasKey('driver', $result);
         $this->assertArrayHasKey('insights', $result);
         $this->assertNotEmpty($result['rows']);
-        $this->assertEquals('sqlite', $result['driver']);
+        $this->assertEquals(DB::connection()->getDriverName(), $result['driver']);
     }
 
     public function test_it_detects_query_type_with_comments(): void

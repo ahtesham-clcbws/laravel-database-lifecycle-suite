@@ -79,7 +79,7 @@ class IndexStandardizerTest extends TestCase
         $standardizer->renameIndex('posts', 'old_slug_unique', 'posts_slug_unique');
 
         $indexes = Schema::getIndexes('posts');
-        $uniqueIndex = \collect($indexes)->firstWhere('unique', true);
+        $uniqueIndex = \collect($indexes)->where('primary', false)->firstWhere('unique', true);
 
         $this->assertNotNull($uniqueIndex);
         $this->assertEquals('posts_slug_unique', $uniqueIndex['name']);

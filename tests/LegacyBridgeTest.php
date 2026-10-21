@@ -86,12 +86,13 @@ class LegacyBridgeTest extends TestCase
 
     public function test_it_respects_custom_primary_key_and_connection(): void
     {
-        $this->bridge->reverseEngineer(['custom_keys'], $this->outputPath, 'testing');
+        $conn = (string) config('database.default');
+        $this->bridge->reverseEngineer(['custom_keys'], $this->outputPath, $conn);
 
         $this->assertFileExists($this->outputPath.'/models/CustomKey.php');
         $model = file_get_contents($this->outputPath.'/models/CustomKey.php');
 
-        $this->assertStringContainsString("protected \$connection = 'testing';", $model);
+        $this->assertStringContainsString("protected \$connection = '{$conn}';", $model);
         $this->assertStringContainsString("protected \$primaryKey = 'code';", $model);
     }
 
