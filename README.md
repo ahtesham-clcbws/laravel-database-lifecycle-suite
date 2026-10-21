@@ -40,6 +40,9 @@
    - Snapshot filenames are sanitized against directory traversal attacks.
 5. **Heuristic PII Auditing**:
    - PII detection uses regex naming conventions (`email`, `phone`, `ssn`, `card`). It is an advisory tool and does not inspect table contents.
+6. **Zero-Trust Dependency Security**:
+   - Broad package-level advisory exceptions are prohibited. All production dependencies are continuously scanned with `composer audit` and `composer validate --strict`.
+   - Historical upstream EOL advisories for Laravel 11 matrix compatibility are explicitly pinned by advisory ID (`policy.advisories.ignore-id` and `audit.ignore`), preventing unvetted security drift while preserving full auditing across all active components.
 
 ---
 

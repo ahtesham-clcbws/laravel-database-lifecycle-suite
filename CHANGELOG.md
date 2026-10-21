@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full schema round-trip verification across SQLite, MySQL, MariaDB, and PostgreSQL covering foreign keys, nullability, composite indexes, and diverse column types.
   - Clear CLI and documentation warnings clarifying that schema snapshots restore structure only, not data backups.
 - **Dependency Security**:
-  - Completely removed advisory ignore policies from `composer.json`, enforcing pure native `composer audit` in CI with zero unverified vulnerability exceptions.
+  - Eliminated broad package-level vulnerability exceptions (`ignore: ["laravel/framework"]`) in `composer.json`.
+  - Pinned exact advisory IDs (`policy.advisories.ignore-id` and `audit.ignore`) for upstream EOL Laravel 11 matrix compatibility while enforcing continuous zero-trust `composer audit` and `composer validate --strict`.
 - **Seeder Security & File Overwrite Protection**:
   - Enforced safe seeder scaffolds in `LegacyBridge` with complete exclusion of live database records, credentials, and sensitive data.
   - Accidental file overwrite protection across migrations, models, seeders, and factories (requires explicit `--force` to replace existing artifacts).
