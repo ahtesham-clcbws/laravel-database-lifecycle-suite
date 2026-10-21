@@ -4,64 +4,81 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite;
 
-use Illuminate\Support\Facades\DB;
 use Exception;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * Class QueryAnalyzer
- * 
- * Analyzes SQL queries (SELECT, INSERT, UPDATE, DELETE) using EXPLAIN and 
- * provides human-readable performance insights.
+ *
+ * Provides safe, read-only query-plan inspection (EXPLAIN / EXPLAIN QUERY PLAN)
+ * across MySQL, MariaDB, PostgreSQL, and SQLite with multi-driver performance insights.
  */
 readonly class QueryAnalyzer
 {
     /**
-     * Analyze a SQL query using EXPLAIN.
+     * Analyze a SQL query using driver-appropriate EXPLAIN mechanics.
      *
-     * @param string $query The SQL query to analyze.
-     * @param string|null $connection The database connection to use.
+     * @param  string  $query  The SQL query to analyze.
+     * @param  string|null  $connection  The database connection to use.
      * @return array Analysis results including driver, raw rows, and insights.
-     * @throws Exception If the query is not supported or if analysis fails.
+     *
+     * @throws Exception|InvalidArgumentException
      */
     public function analyze(string $query, ?string $connection = null): array
     {
-        try {
-            $driver = DB::connection($connection)->getDriverName();
-            
-            // Extract the first word of the query, skipping comments and whitespace
-            $cleanQuery = preg_replace('!/\*.*?\*/!s', '', $query); // Remove block comments
-            $cleanQuery = preg_replace('/--.*$/m', '', (string) $cleanQuery); // Remove line comments
-            
-            if (preg_match('/^\s*([a-z]+)/i', (string) $cleanQuery, $matches)) {
-                $queryType = strtoupper($matches[1]);
-            } else {
-                throw new Exception("Unable to determine query type.");
-            }
-            
-            $allowedTypes = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
-            
-            if (!in_array($queryType, $allowedTypes)) {
-                throw new Exception("Query analysis is only supported for: " . implode(', ', $allowedTypes));
-            }
+        $driver = DB::connection($connection)->getDriverName();
 
-            $results = DB::connection($connection)->select("EXPLAIN " . $query);
+        // 1. Remove comments and extraneous whitespace
+        $cleanQuery = (string) preg_replace('!/\*.*?\*/!s', '', $query);
+        $cleanQuery = (string) preg_replace('/--.*$/m', '', $cleanQuery);
+        $cleanQuery = (string) preg_replace('/#.*$/m', '', $cleanQuery);
+        $cleanQuery = trim($cleanQuery);
+
+        if ($cleanQuery === '') {
+            throw new InvalidArgumentException('Empty SQL query provided for analysis.');
+        }
+
+        // 2. Reject multiple statements (prevent SQL injection / chaining)
+        if (preg_match('/;(?!\s*$)/', $cleanQuery)) {
+            throw new InvalidArgumentException('Multiple SQL statements are strictly rejected for safety.');
+        }
+
+        // 3. Extract statement type and enforce read-only semantics
+        if (! preg_match('/^\s*([a-z]+)/i', $cleanQuery, $matches)) {
+            throw new InvalidArgumentException('Unable to determine query statement type.');
+        }
+
+        $queryType = strtoupper($matches[1]);
+        $allowedTypes = ['SELECT', 'WITH'];
+
+        if (! in_array($queryType, $allowedTypes, true)) {
+            throw new InvalidArgumentException('Unsafe query rejected. Only read-only SELECT and WITH statements are permitted for query plan analysis.');
+        }
+
+        // 4. Execute driver-appropriate EXPLAIN
+        try {
+            $explainSql = match ($driver) {
+                'sqlite' => 'EXPLAIN QUERY PLAN '.$cleanQuery,
+                'mysql', 'mariadb', 'pgsql' => 'EXPLAIN '.$cleanQuery,
+                default => 'EXPLAIN '.$cleanQuery,
+            };
+
+            $results = DB::connection($connection)->select($explainSql);
 
             return [
                 'driver' => $driver,
+                'query' => $cleanQuery,
                 'rows' => $results,
                 'insights' => $this->generateInsights($results, $driver),
             ];
         } catch (Exception $e) {
-            throw new Exception("Failed to analyze query: " . $e->getMessage());
+            throw new Exception('Query plan analysis failed: '.$e->getMessage());
         }
     }
 
     /**
-     * Generate human-readable insights from EXPLAIN results.
-     *
-     * @param array $results
-     * @param string $driver
-     * @return array
+     * Generate human-readable performance insights based on execution plan.
      */
     protected function generateInsights(array $results, string $driver): array
     {
@@ -70,36 +87,59 @@ readonly class QueryAnalyzer
         foreach ($results as $row) {
             $row = (array) $row;
 
-            if ($driver === 'mysql') {
-                if (isset($row['type']) && $row['type'] === 'ALL') {
-                    $insights[] = "⚠️  Full Table Scan detected on [{$row['table']}]. No index was used.";
+            if ($driver === 'sqlite') {
+                $detail = (string) ($row['detail'] ?? '');
+                if (str_contains($detail, 'SCAN')) {
+                    $insights[] = "⚠️  Full Table Scan detected: {$detail}. Consider adding an index.";
+                } elseif (str_contains($detail, 'SEARCH') && str_contains($detail, 'USING INDEX')) {
+                    $insights[] = "✅ Index search utilized: {$detail}.";
+                } elseif (str_contains($detail, 'USE TEMP B-TREE')) {
+                    $insights[] = "⚠️  Temporary B-Tree utilized for sorting/grouping: {$detail}.";
                 }
-                if (isset($row['rows']) && (int)$row['rows'] > 1000) {
-                    $insights[] = "ℹ️  Large number of rows scanned (" . $row['rows'] . ") on [{$row['table']}].";
+            } elseif ($driver === 'mysql' || $driver === 'mariadb') {
+                $table = (string) ($row['table'] ?? '');
+                $type = (string) ($row['type'] ?? '');
+                $key = (string) ($row['key'] ?? '');
+                $rows = (int) ($row['rows'] ?? 0);
+                $extra = (string) ($row['Extra'] ?? '');
+
+                if ($type === 'ALL') {
+                    $insights[] = "⚠️  Full Table Scan detected on [{$table}]. No index was used.";
+                } elseif ($key !== '') {
+                    $insights[] = "✅ Using index [{$key}] for table [{$table}].";
                 }
-                if (isset($row['key']) && $row['key']) {
-                    $insights[] = "✅ Using index [{$row['key']}] for table [{$row['table']}].";
+
+                if ($rows > 1000) {
+                    $insights[] = "ℹ️  High row scan count ({$rows} rows) estimated for table [{$table}].";
                 }
-                if (isset($row['Extra']) && str_contains($row['Extra'], 'Using temporary')) {
-                    $insights[] = "⚠️  Query uses a temporary table (potential performance bottleneck).";
+
+                if (str_contains($extra, 'Using temporary')) {
+                    $insights[] = '⚠️  Query uses an internal temporary table on disk/memory.';
                 }
-                if (isset($row['Extra']) && str_contains($row['Extra'], 'Using filesort')) {
-                    $insights[] = "⚠️  Query uses filesort (potential performance bottleneck on large sets).";
+                if (str_contains($extra, 'Using filesort')) {
+                    $insights[] = '⚠️  Query uses filesort (potential sorting bottleneck on large datasets).';
                 }
             } elseif ($driver === 'pgsql') {
                 $plan = (string) array_values($row)[0];
                 if (str_contains($plan, 'Seq Scan')) {
-                    $insights[] = "⚠️  Sequential Scan (Full Table Scan) detected in plan.";
+                    $insights[] = '⚠️  Sequential Scan (Full Table Scan) detected in PostgreSQL plan.';
                 }
-                if (str_contains($plan, 'Index Scan') || str_contains($plan, 'Index Only Scan')) {
-                    $insights[] = "✅ Index Scan detected in plan.";
+                if (str_contains($plan, 'Index Scan') || str_contains($plan, 'Index Only Scan') || str_contains($plan, 'Bitmap Index Scan')) {
+                    $insights[] = '✅ Index Scan detected in plan.';
                 }
                 if (str_contains($plan, 'Sort Method: quicksort')) {
-                    $insights[] = "✅ Optimized sort detected.";
+                    $insights[] = '✅ In-memory quicksort utilized for sorting.';
+                }
+                if (str_contains($plan, 'external merge')) {
+                    $insights[] = '⚠️  Disk-based external merge sort detected (work_mem may be insufficient).';
                 }
             }
         }
 
-        return $insights;
+        if (empty($insights)) {
+            $insights[] = 'ℹ️  Query plan generated successfully. No prominent performance bottlenecks detected.';
+        }
+
+        return array_values(array_unique($insights));
     }
 }

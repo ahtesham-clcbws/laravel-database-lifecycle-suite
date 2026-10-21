@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Commands;
 
-use Illuminate\Console\Command;
 use Clcbws\DatabaseLifecycleSuite\QueryAnalyzer;
+use Illuminate\Console\Command;
 
 /**
  * Class QueryExplainCommand
- * 
+ *
  * Artisan command to explain SQL queries and get performance insights.
  */
 class QueryExplainCommand extends Command
@@ -26,32 +26,29 @@ class QueryExplainCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param QueryAnalyzer $analyzer
-     * @return int
      */
     public function handle(QueryAnalyzer $analyzer): int
     {
         $query = $this->argument('query');
         $connection = $this->option('database');
 
-        $this->info("🔬 Analyzing query" . ($connection ? " in [{$connection}]" : "") . "...");
+        $this->info('🔬 Analyzing query'.($connection ? " in [{$connection}]" : '').'...');
 
         try {
             $report = $analyzer->analyze((string) $query, $connection);
 
             $this->comment("\nEXPLAIN Results ({$report['driver']}):");
-            
+
             // Format rows for display
             $rows = array_map(function ($row) {
                 return (array) $row;
             }, $report['rows']);
-            
-            if (!empty($rows)) {
+
+            if (! empty($rows)) {
                 $this->table(array_keys($rows[0]), $rows);
             }
 
-            if (!empty($report['insights'])) {
+            if (! empty($report['insights'])) {
                 $this->warn("\n💡 Performance Insights:");
                 foreach ($report['insights'] as $insight) {
                     $this->line("- {$insight}");
@@ -62,6 +59,7 @@ class QueryExplainCommand extends Command
 
         } catch (\Exception $e) {
             $this->error($e->getMessage());
+
             return 1;
         }
 

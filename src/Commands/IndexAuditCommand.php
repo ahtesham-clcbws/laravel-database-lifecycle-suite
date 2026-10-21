@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Clcbws\DatabaseLifecycleSuite\Commands;
 
-use Illuminate\Console\Command;
 use Clcbws\DatabaseLifecycleSuite\IndexHealthAuditor;
+use Illuminate\Console\Command;
 
 /**
  * Class IndexAuditCommand
- * 
+ *
  * Artisan command to identify foreign keys that are missing database indexes.
  */
 class IndexAuditCommand extends Command
@@ -17,7 +17,9 @@ class IndexAuditCommand extends Command
     /**
      * @var string
      */
-    protected $signature = 'db:index-audit {--database= : The database connection to use}';
+    protected $signature = 'db:index-audit 
+                            {--database= : The database connection to use}
+                            {--strict : Return a non-zero exit code if missing foreign key indexes are found}';
 
     /**
      * @var string
@@ -26,28 +28,39 @@ class IndexAuditCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param IndexHealthAuditor $auditor The underlying audit engine.
-     * @return int Exit code (0 for success).
      */
     public function handle(IndexHealthAuditor $auditor): int
     {
         $connection = $this->option('database');
-        $this->info("🔍 Auditing foreign key indexes" . ($connection ? " in [{$connection}]" : "") . "...");
+        $this->info('🔍 Auditing foreign key indexes'.($connection ? " in [{$connection}]" : '').'...');
 
         $missing = $auditor->getMissingIndexes($connection);
 
         if (empty($missing)) {
             $this->info('✅ All foreign keys are correctly indexed.');
-            return 0;
+
+            return self::SUCCESS;
         }
 
-        $this->warn('⚠️ Found ' . count($missing) . ' unindexed columns that should likely have an index:');
+        $this->warn('⚠️ Found '.count($missing).' unindexed columns that should likely have an index:');
 
-        $this->table(['Table', 'Column', 'Issue Type', 'Details'], $missing);
+        $rows = array_map(function ($item) {
+            return [
+                $item['table'],
+                $item['column'],
+                $item['type'],
+                $item['details'],
+            ];
+        }, $missing);
+
+        $this->table(['Table', 'Column', 'Issue Type', 'Details'], $rows);
 
         $this->comment("\nTip: Indexing foreign keys improves JOIN performance and prevents table locks during deletes.");
 
-        return 0;
+        if ($this->option('strict')) {
+            return self::FAILURE;
+        }
+
+        return self::SUCCESS;
     }
 }

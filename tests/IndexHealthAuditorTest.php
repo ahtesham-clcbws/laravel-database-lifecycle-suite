@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
 use Clcbws\DatabaseLifecycleSuite\IndexHealthAuditor;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 class IndexHealthAuditorTest extends TestCase
 {
@@ -15,7 +15,7 @@ class IndexHealthAuditorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->auditor = new IndexHealthAuditor();
+        $this->auditor = new IndexHealthAuditor;
 
         Schema::create('users', function (Blueprint $table) {
             $table->id();
