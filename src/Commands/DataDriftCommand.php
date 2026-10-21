@@ -142,7 +142,8 @@ class DataDriftCommand extends Command
                     $this->info(" + Synced row [{$key}]");
                     $synced++;
                 } else {
-                    $this->error(" ! Failed to sync row [{$key}]");
+                    $err = $detector->getLastError() ? ': '.$detector->getLastError() : '';
+                    $this->error(" ! Failed to sync row [{$key}]{$err}");
                     $failed++;
                 }
             }
@@ -162,7 +163,8 @@ class DataDriftCommand extends Command
                     $this->info(" + Updated row [{$key}]");
                     $synced++;
                 } else {
-                    $this->error(" ! Failed to update row [{$key}]");
+                    $err = $detector->getLastError() ? ': '.$detector->getLastError() : '';
+                    $this->error(" ! Failed to update row [{$key}]{$err}");
                     $failed++;
                 }
             }

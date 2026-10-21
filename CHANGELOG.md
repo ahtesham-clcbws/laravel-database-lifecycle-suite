@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Production Safety Safeguards**:
   - Preflight schema validation in `SchemaSnapshotManager` before applying any restore operations.
+  - Lossy schema detection rejecting generated/virtual columns, unsupported driver types, and invalid foreign key referential actions.
+  - Fail-closed test database protection in `TestCase::assertSafeTestDatabase()` preventing destructive table cleanup on unapproved or non-test database hosts/names.
   - Strict preservation of non-incrementing integer primary keys during snapshot restoration (auto-increment is only assigned when explicitly indicated by metadata).
   - Snapshot format versioning (`version: "1.0"`) and JSON integrity checks.
   - Path traversal protections preventing arbitrary file access via snapshot names.
@@ -21,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accidental file overwrite protection across migrations, models, seeders, and factories (requires explicit `--force` to replace existing artifacts).
 - **Data Drift Hardening & Concurrency Protection**:
   - Collision-safe JSON tuple composite key serialization preventing delimiter collision across composite keys.
-  - Optimistic concurrency conflict detection in `syncRow` aborting updates when destination rows change during review.
+  - Pessimistic row locking (`lockForUpdate()`) and concurrency conflict detection in `syncRow` aborting updates when destination rows change during review or are deleted concurrently.
+  - Detailed diagnostic reporting via `getLastError()` on synchronization conflicts.
   - Memory-bounded comparison (`--limit`, default 1,000 records) to prevent OOM on large datasets.
   - Multi-connection validation verifying existence of tables on both source and destination connections.
   - Transaction-wrapped row synchronization with explicit change previews.
@@ -32,8 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Protected single-column `unique` constraints in `RedundantIndexDetector` from false-positive redundancy by composite unique indexes.
 - **Query Analyzer Security Hardening**:
   - Strictly enforced read-only execution supporting `SELECT` and non-modifying `WITH` queries.
-  - String-literal masking and SQL comment stripping preventing keyword obfuscation and SQL injection chaining.
-  - Explicit rejection of modifying CTEs (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, etc.) inside `WITH` blocks.
+  - Explicit whitelisting of supported drivers (`sqlite`, `mysql`, `mariadb`, `pgsql`).
+  - String-literal masking, backtick identifier masking, and SQL comment stripping preventing keyword obfuscation and SQL injection chaining.
+  - Explicit rejection of modifying CTEs, `INTO OUTFILE`, `COPY`, `ANALYZE`, and null bytes.
   - Rejection of multi-statement SQL chains (`;`) outside string literals.
   - Support for SQLite `EXPLAIN QUERY PLAN` plan interpretation, PostgreSQL format analysis, and MariaDB driver aliases.
 - **Scorecard Modernization**:
@@ -47,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Isolated database integration test jobs for MySQL 8.0, MariaDB 11.4, and PostgreSQL 16 using GitHub Actions service containers.
   - Standard `phpunit.xml.dist` tracked in Git for out-of-the-box runner execution.
   - Automated Pint formatting checks and PHPStan level 5 analysis.
+  - Native Composer security auditing enabled across CI workflows without advisory bypasses.
 
 ### Changed
 - Refactored `LegacyBridge` model generation to respect custom connections, primary keys, and auto-increment properties.

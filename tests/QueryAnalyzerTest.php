@@ -111,4 +111,36 @@ class QueryAnalyzerTest extends TestCase
         $insightsString = implode(' ', $result['insights']);
         $this->assertStringContainsString('Full Table Scan', $insightsString);
     }
+
+    public function test_it_rejects_into_outfile_injection(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe modifying keyword [INTO] detected');
+        $this->analyzer->analyze("SELECT * FROM users INTO OUTFILE '/tmp/dump.txt'");
+    }
+
+    public function test_it_rejects_null_bytes(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe query containing null bytes');
+        $this->analyzer->analyze("SELECT * FROM users\0 WHERE id = 1");
+    }
+
+    public function test_it_rejects_unsupported_driver(): void
+    {
+        config()->set('database.connections.unsupported_db', [
+            'driver' => 'sqlsrv',
+            'database' => 'test',
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsupported database driver [sqlsrv]');
+        $this->analyzer->analyze('SELECT * FROM users', 'unsupported_db');
+    }
+
+    public function test_it_permits_backtick_quoted_identifiers(): void
+    {
+        $result = $this->analyzer->analyze('SELECT `id`, `email` FROM `users` WHERE `email` = \'test@example.com\'');
+        $this->assertNotEmpty($result['rows']);
+    }
 }

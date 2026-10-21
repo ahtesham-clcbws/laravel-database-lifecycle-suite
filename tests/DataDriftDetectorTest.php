@@ -199,4 +199,36 @@ class DataDriftDetectorTest extends TestCase
             ->expectsOutputToContain('data drift discrepancies detected')
             ->assertExitCode(1);
     }
+
+    public function test_sync_row_detects_concurrent_modification_and_reports_conflict(): void
+    {
+        DB::connection('testing')->table('products')->insert(['id' => 88, 'sku' => 'CONCURRENT-1', 'stock' => 5]);
+
+        // Drift baseline thought live had stock 5
+        $baseline = ['id' => 88, 'sku' => 'CONCURRENT-1', 'stock' => 5];
+        $sourceData = ['id' => 88, 'sku' => 'CONCURRENT-1', 'stock' => 10];
+
+        // Simulate concurrent modification on destination
+        DB::connection('testing')->table('products')->where('id', 88)->update(['stock' => 999]);
+
+        $success = $this->detector->syncRow('products', $sourceData, 'testing', ['id'], $baseline);
+
+        $this->assertFalse($success);
+        $this->assertNotNull($this->detector->getLastError());
+        $this->assertStringContainsString('Concurrent modification detected', $this->detector->getLastError());
+        $this->assertEquals(999, DB::connection('testing')->table('products')->where('id', 88)->value('stock'));
+    }
+
+    public function test_sync_row_detects_concurrent_deletion(): void
+    {
+        $baseline = ['id' => 77, 'sku' => 'DELETED-1', 'stock' => 2];
+        $sourceData = ['id' => 77, 'sku' => 'DELETED-1', 'stock' => 5];
+
+        // Row does not exist on destination
+        $success = $this->detector->syncRow('products', $sourceData, 'testing', ['id'], $baseline);
+
+        $this->assertFalse($success);
+        $this->assertNotNull($this->detector->getLastError());
+        $this->assertStringContainsString('Stale baseline: destination row was deleted concurrently', $this->detector->getLastError());
+    }
 }

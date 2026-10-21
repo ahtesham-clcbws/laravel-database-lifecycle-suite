@@ -43,19 +43,66 @@ class TestCase extends Orchestra
 
     /**
      * Wipe all tables on persistent multi-database test connections between test runs.
+     * Enforces strict fail-closed validation of disposable test databases before dropping tables.
      */
     protected function cleanDatabase(): void
     {
         $defaultConn = (string) config('database.default', 'testing');
         if (in_array($defaultConn, ['mysql', 'pgsql'], true)) {
-            try {
-                Schema::connection($defaultConn)->dropAllTables();
-                if (in_array(config('database.connections.source.driver'), ['mysql', 'pgsql'], true)) {
-                    Schema::connection('source')->dropAllTables();
-                }
-            } catch (\Throwable) {
-                // Ignore cleanup errors on fresh databases
+            $this->assertSafeTestDatabase($defaultConn);
+            Schema::connection($defaultConn)->dropAllTables();
+
+            $sourceDriver = (string) config('database.connections.source.driver', '');
+            if (in_array($sourceDriver, ['mysql', 'pgsql'], true)) {
+                $this->assertSafeTestDatabase('source');
+                Schema::connection('source')->dropAllTables();
             }
+        }
+    }
+
+    /**
+     * Verify that a connection is explicitly designated as a disposable test database.
+     * Fails closed by throwing a RuntimeException if any safety check fails.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertSafeTestDatabase(string $connection): void
+    {
+        // 1. Environment must strictly be 'testing'
+        if (app()->environment() !== 'testing') {
+            throw new \RuntimeException('Destructive test database cleanup refused: APP_ENV is ['.app()->environment().'], not [testing].');
+        }
+
+        $config = config("database.connections.{$connection}");
+        if (! is_array($config) || empty($config)) {
+            throw new \RuntimeException("Destructive test database cleanup refused: Connection [{$connection}] is not configured.");
+        }
+
+        $driver = (string) ($config['driver'] ?? '');
+        $database = (string) ($config['database'] ?? '');
+
+        // 2. In-memory SQLite is inherently disposable
+        if ($driver === 'sqlite') {
+            if ($database === ':memory:' || str_contains($database, 'test') || str_contains($database, 'tmp')) {
+                return;
+            }
+            throw new \RuntimeException("Destructive test cleanup refused: SQLite database [{$database}] does not appear disposable.");
+        }
+
+        // 3. Reject non-local/unknown hosts for persistent engines
+        $host = (string) ($config['host'] ?? '127.0.0.1');
+        $allowedHosts = ['127.0.0.1', 'localhost', '::1', 'mysql', 'mariadb', 'postgres', 'postgresql'];
+        if (! in_array(strtolower($host), $allowedHosts, true) && ! str_ends_with($host, '.internal') && ! str_ends_with($host, '.local')) {
+            throw new \RuntimeException("Destructive test database cleanup refused: Host [{$host}] is not an approved local/container test host.");
+        }
+
+        // 4. Database name must explicitly contain test markers
+        $lowerDb = strtolower($database);
+        $hasTestMarker = str_contains($lowerDb, 'test') || str_contains($lowerDb, 'lifecycle') || str_ends_with($lowerDb, '_tmp');
+        $isForbidden = in_array($lowerDb, ['production', 'prod', 'master', 'main', 'live', 'app', 'laravel'], true);
+
+        if (! $hasTestMarker || $isForbidden) {
+            throw new \RuntimeException("Destructive test database cleanup refused: Database name [{$database}] does not contain an approved disposable test marker.");
         }
     }
 

@@ -16,8 +16,18 @@ use InvalidArgumentException;
  * Supports single and composite primary keys, bounded memory safety,
  * and deterministic column-level comparisons.
  */
-readonly class DataDriftDetector
+class DataDriftDetector
 {
+    protected ?string $lastError = null;
+
+    /**
+     * Get the last synchronization error or conflict detail.
+     */
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
     /**
      * Check a specific table for data drift against a source connection.
      *
@@ -186,7 +196,11 @@ readonly class DataDriftDetector
         $destination = $destination ?: DB::getDefaultConnection();
         $primaryKeys = $primaryKeys ?: $this->getPrimaryKeys($table, $destination);
 
+        $this->lastError = null;
+
         if (empty($primaryKeys)) {
+            $this->lastError = "No primary keys identified for table [{$table}].";
+
             return false;
         }
 
@@ -206,23 +220,34 @@ readonly class DataDriftDetector
                     $conditions[$pk] = $data[$pk];
                 }
 
-                // Optimistic concurrency verification: ensure destination row has not changed concurrently
+                // Acquire exclusive pessimistic lock on the target row if it exists
+                $existing = DB::connection($destination)->table($table)->where($conditions)->lockForUpdate()->first();
+
+                // Concurrency verification: ensure destination row has not changed concurrently
                 if ($expectedDestinationState !== null) {
-                    $existing = DB::connection($destination)->table($table)->where($conditions)->first();
-                    if ($existing !== null) {
-                        $currentArray = (array) $existing;
-                        $conflicts = $this->compareRowValues($expectedDestinationState, $currentArray);
-                        if (! empty($conflicts)) {
-                            throw new \RuntimeException('Concurrent modification detected for row: destination state no longer matches drift baseline.');
-                        }
+                    if ($existing === null) {
+                        throw new \RuntimeException('Stale baseline: destination row was deleted concurrently.');
+                    }
+
+                    $currentArray = (array) $existing;
+                    $conflicts = $this->compareRowValues($expectedDestinationState, $currentArray);
+                    if (! empty($conflicts)) {
+                        $conflictFields = implode(', ', array_keys($conflicts));
+                        throw new \RuntimeException("Concurrent modification detected: destination row was modified concurrently on columns [{$conflictFields}].");
                     }
                 }
 
-                DB::connection($destination)->table($table)->updateOrInsert($conditions, $data);
+                if ($existing !== null) {
+                    DB::connection($destination)->table($table)->where($conditions)->update($data);
+                } else {
+                    DB::connection($destination)->table($table)->insert($data);
+                }
             });
 
             return true;
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
+            $this->lastError = $e->getMessage();
+
             return false;
         }
     }

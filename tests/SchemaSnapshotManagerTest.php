@@ -151,4 +151,50 @@ class SchemaSnapshotManagerTest extends TestCase
 
         Schema::dropIfExists('non_inc_table');
     }
+
+    public function test_it_detects_and_rejects_lossy_generated_columns(): void
+    {
+        $definition = [
+            'columns' => [
+                ['name' => 'id', 'type_name' => 'integer', 'nullable' => false, 'default' => null, 'auto_increment' => true],
+                ['name' => 'price', 'type_name' => 'integer', 'nullable' => false, 'default' => null],
+                ['name' => 'total_vat', 'type_name' => 'integer', 'nullable' => false, 'default' => null, 'virtual' => true],
+            ],
+            'indexes' => [
+                ['name' => 'pk', 'columns' => ['id'], 'primary' => true],
+            ],
+            'foreign_keys' => [],
+        ];
+
+        $lossy = $this->manager->getLossyFeatures($definition);
+        $this->assertNotEmpty($lossy);
+        $this->assertStringContainsString('Generated or computed column [total_vat]', $lossy[0]);
+
+        $this->assertFalse($this->manager->canRestoreWithoutLoss($definition));
+        $this->assertFalse($this->manager->restoreTable('virtual_table', $definition));
+        $this->assertStringContainsString('lossy features', $this->manager->getLastError() ?? '');
+    }
+
+    public function test_it_detects_invalid_foreign_key_referential_action(): void
+    {
+        $definition = [
+            'columns' => [
+                ['name' => 'id', 'type_name' => 'integer', 'nullable' => false, 'default' => null],
+                ['name' => 'user_id', 'type_name' => 'integer', 'nullable' => false, 'default' => null],
+            ],
+            'indexes' => [],
+            'foreign_keys' => [
+                [
+                    'foreign_table' => 'users',
+                    'columns' => ['user_id'],
+                    'foreign_columns' => ['id'],
+                    'on_delete' => 'INVALID_ACTION',
+                ],
+            ],
+        ];
+
+        $lossy = $this->manager->getLossyFeatures($definition);
+        $this->assertNotEmpty($lossy);
+        $this->assertStringContainsString('Unsupported foreign key referential action [invalid_action]', $lossy[0]);
+    }
 }

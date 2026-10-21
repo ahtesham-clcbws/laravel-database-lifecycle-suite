@@ -180,6 +180,10 @@ class SchemaSnapshotManager
             if (! $this->isSupportedDatabaseType($typeName)) {
                 $issues[] = "Unsupported column type [{$typeName}] on column [{$colName}]";
             }
+
+            if (! empty($column['generation']) || ! empty($column['virtual']) || ! empty($column['generated'])) {
+                $issues[] = "Generated or computed column [{$colName}] cannot be faithfully reconstructed from snapshot";
+            }
         }
 
         if (isset($definition['indexes']) && is_array($definition['indexes'])) {
@@ -201,6 +205,18 @@ class SchemaSnapshotManager
             foreach ($definition['foreign_keys'] as $fk) {
                 if (! is_array($fk) || empty($fk['foreign_table']) || empty($fk['columns']) || empty($fk['foreign_columns'])) {
                     $issues[] = 'Malformed foreign key definition';
+
+                    continue;
+                }
+
+                foreach (['on_delete', 'on_update'] as $actionKey) {
+                    if (isset($fk[$actionKey]) && is_string($fk[$actionKey]) && $fk[$actionKey] !== '') {
+                        $action = strtolower($fk[$actionKey]);
+                        $validActions = ['cascade', 'restrict', 'set null', 'no action', 'set default'];
+                        if (! in_array($action, $validActions, true)) {
+                            $issues[] = "Unsupported foreign key referential action [{$action}] on table [{$fk['foreign_table']}]";
+                        }
+                    }
                 }
             }
         }

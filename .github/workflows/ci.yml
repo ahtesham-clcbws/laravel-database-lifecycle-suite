@@ -33,16 +33,18 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          composer config -g policy.advisories.block false || true
           if [ "${{ matrix.laravel }}" = "11.*" ]; then
             composer require "orchestra/testbench:^9.0" "illuminate/support:11.*" "illuminate/database:11.*" "illuminate/console:11.*" --no-interaction --no-update
           else
             composer require "orchestra/testbench:^10.0" "illuminate/support:12.*" "illuminate/database:12.*" "illuminate/console:12.*" --no-interaction --no-update
           fi
-          composer update --prefer-stable --prefer-dist --no-interaction --no-audit
+          composer update --prefer-stable --prefer-dist --no-interaction
 
       - name: Validate Composer
         run: composer validate --strict --no-check-lock
+
+      - name: Security Audit
+        run: composer audit
 
       - name: Execute Tests
         run: vendor/bin/phpunit
@@ -72,9 +74,7 @@ jobs:
           coverage: none
 
       - name: Install Dependencies
-        run: |
-          composer config -g policy.advisories.block false || true
-          composer update --prefer-dist --no-interaction --no-audit
+        run: composer update --prefer-dist --no-interaction
 
       - name: Execute Tests
         env:
@@ -111,9 +111,7 @@ jobs:
           coverage: none
 
       - name: Install Dependencies
-        run: |
-          composer config -g policy.advisories.block false || true
-          composer update --prefer-dist --no-interaction --no-audit
+        run: composer update --prefer-dist --no-interaction
 
       - name: Execute Tests
         env:
@@ -150,9 +148,7 @@ jobs:
           coverage: none
 
       - name: Install Dependencies
-        run: |
-          composer config -g policy.advisories.block false || true
-          composer update --prefer-dist --no-interaction --no-audit
+        run: composer update --prefer-dist --no-interaction
 
       - name: Execute Tests
         env:
@@ -179,12 +175,13 @@ jobs:
           coverage: none
 
       - name: Install Dependencies
-        run: |
-          composer config -g policy.advisories.block false || true
-          composer update --prefer-dist --no-interaction --no-audit
+        run: composer update --prefer-dist --no-interaction
 
       - name: Run Pint (Code Formatting)
         run: vendor/bin/pint --test
+
+      - name: Run PHPStan (Static Analysis)
+        run: vendor/bin/phpstan analyse
 
       - name: Run PHPStan (Static Analysis)
         run: vendor/bin/phpstan analyse

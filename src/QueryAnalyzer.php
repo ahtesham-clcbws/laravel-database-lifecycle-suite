@@ -29,13 +29,17 @@ readonly class QueryAnalyzer
     {
         $driver = DB::connection($connection)->getDriverName();
 
+        $supportedDrivers = ['sqlite', 'mysql', 'mariadb', 'pgsql'];
+        if (! in_array($driver, $supportedDrivers, true)) {
+            throw new InvalidArgumentException("Unsupported database driver [{$driver}] for query analysis. Supported drivers are: ".implode(', ', $supportedDrivers).'.');
+        }
+
         $cleanQuery = $this->validateAndSanitizeQuery($query);
 
         // Execute driver-appropriate EXPLAIN
         try {
             $explainSql = match ($driver) {
                 'sqlite' => 'EXPLAIN QUERY PLAN '.$cleanQuery,
-                'mysql', 'mariadb', 'pgsql' => 'EXPLAIN '.$cleanQuery,
                 default => 'EXPLAIN '.$cleanQuery,
             };
 
@@ -59,6 +63,11 @@ readonly class QueryAnalyzer
      */
     public function validateAndSanitizeQuery(string $query): string
     {
+        // 0. Reject null bytes or binary corruption
+        if (str_contains($query, "\0")) {
+            throw new InvalidArgumentException('Unsafe query containing null bytes.');
+        }
+
         // 1. Remove comments safely
         $noComments = (string) preg_replace('!/\*.*?\*/!s', ' ', $query);
         $noComments = (string) preg_replace('/(--|#).*$/m', ' ', $noComments);
@@ -73,6 +82,8 @@ readonly class QueryAnalyzer
         $masked = (string) preg_replace("/'(''|\\\\'|[^'])*'/", "'__STR__'", $trimmed);
         // Mask double-quoted strings: "..."
         $masked = (string) preg_replace('/"(""|\\\\"|[^"])*"/', '"__STR__"', $masked);
+        // Mask backtick identifiers: `...`
+        $masked = (string) preg_replace('/`([^`]|``)*`/', '`__ID__`', $masked);
 
         // 3. Reject multiple statements (semicolons outside string literals)
         $strippedSemicolons = rtrim($masked, "; \t\n\r\0\x0B");
@@ -90,11 +101,12 @@ readonly class QueryAnalyzer
             throw new InvalidArgumentException("Unsafe statement type [{$queryType}]. Only read-only SELECT and WITH statements are permitted.");
         }
 
-        // 5. Reject modifying DDL / DML keywords anywhere outside string literals
+        // 5. Reject modifying DDL / DML and filesystem/execution keywords anywhere outside string literals
         $modifyingKeywords = [
             'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE',
             'CREATE', 'REPLACE', 'MERGE', 'GRANT', 'REVOKE', 'LOCK',
-            'CALL', 'EXEC', 'EXECUTE',
+            'CALL', 'EXEC', 'EXECUTE', 'VACUUM', 'COPY', 'INTO',
+            'OUTFILE', 'DUMPFILE', 'LOAD_FILE', 'ANALYZE',
         ];
 
         $pattern = '/\b('.implode('|', $modifyingKeywords).')\b/i';
