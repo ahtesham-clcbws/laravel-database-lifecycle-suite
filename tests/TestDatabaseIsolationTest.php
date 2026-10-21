@@ -47,7 +47,7 @@ class TestDatabaseIsolationTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('is not on the authorized disposable test database whitelist');
+        $this->expectExceptionMessage('is a forbidden production or system database name');
 
         $this->assertSafeTestDatabase('unsafe_db');
     }
@@ -63,9 +63,57 @@ class TestDatabaseIsolationTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('is not on the authorized disposable test database whitelist');
+        $this->expectExceptionMessage('is a forbidden production or system database name');
 
         $this->assertSafeTestDatabase('generic_db');
+    }
+
+    public function test_it_rejects_unwhitelisted_database_names(): void
+    {
+        config()->set('database.connections.custom_db', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'database' => 'some_unapproved_database',
+            'is_disposable' => true,
+            'test_database_owner' => 'laravel-database-lifecycle-suite',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('is not on the authorized disposable test database whitelist');
+
+        $this->assertSafeTestDatabase('custom_db');
+    }
+
+    public function test_it_rejects_sql_injection_in_database_identifier(): void
+    {
+        config()->set('database.connections.injected_db', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'database' => 'lifecycle_test; DROP TABLE users; --',
+            'is_disposable' => true,
+            'test_database_owner' => 'laravel-database-lifecycle-suite',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Invalid database identifier');
+
+        $this->assertSafeTestDatabase('injected_db');
+    }
+
+    public function test_it_rejects_sql_injection_in_source_database_provisioning(): void
+    {
+        config()->set('database.connections.injected_source', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'database' => 'lifecycle_source; DROP TABLE users; --',
+            'is_disposable' => true,
+            'test_database_owner' => 'laravel-database-lifecycle-suite',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Invalid database identifier');
+
+        $this->ensureSourceDatabaseExists('testing', 'injected_source');
     }
 
     public function test_it_rejects_missing_owner_marker(): void

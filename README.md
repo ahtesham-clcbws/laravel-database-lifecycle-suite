@@ -217,13 +217,16 @@ php artisan db:erd --output=docs/schema.mmd
 | **PHP** | `^8.2 \| ^8.3 \| ^8.4` | Verified in multi-version test matrix |
 | **Laravel Framework** | `^11.0 \| ^12.0` | Verified on Laravel 11.x and 12.x |
 | **Database Engines** | SQLite 3, MySQL 8.0+, MariaDB 11.4+, PostgreSQL 16+ | Integration tested via automated CI containers |
-| **Laravel 13** | Planned for `v2.0.0` | Laravel 13 dropped PHP 8.2 support (requiring PHP ^8.3) and modified DBAL schema reflection structures. To preserve strict SemVer stability and PHP 8.2 support for 1.x installations, Laravel 13 support will be released in major version 2.0.0. |
+| **Laravel 13** | Planned for `v2.0.0` | Laravel 13 dropped PHP 8.2 support (requiring PHP ^8.3), decoupled Symfony Console 8 command exit constants, and tightened schema metadata docblocks. To preserve strict SemVer stability and PHP 8.2 support for 1.x installations, full Laravel 13 support will be released in major version 2.0.0. |
 
 ### 🛡️ Safety Boundaries & Unsupported Features
 
+- **Dependency Security**:
+  - Zero vulnerability advisory bypasses or ignored security policies in `composer.json`. Native `composer audit` is enforced strictly in CI without exceptions.
+
 - **Schema Restoration Safe Boundaries**:
   - Automatically identifies and rejects lossy or unportable features before mutating databases (virtual/generated columns, unsupported vendor geometry/blob types, and incompatible foreign key actions like `SET DEFAULT` on MySQL).
-  - Explicit integer primary keys are preserved without automatic conversion to auto-increment unless metadata specifies `auto_increment: true`.
+  - Explicit integer primary keys and column signedness (including `unsigned` integers) are preserved without distortion.
   - Destructive recreation (`--recreate`) is strictly blocked in production environments.
   - *MySQL/MariaDB Implicit DDL Commits*: MySQL auto-commits active transactions upon executing DDL statements (`CREATE TABLE`, `DROP TABLE`). To prevent partial restorations, the suite executes complete preflight validation across the snapshot prior to issuing any DDL commands.
 
@@ -234,15 +237,17 @@ php artisan db:erd --output=docs/schema.mmd
     - Modifying DDL / DML (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`, `MERGE`, etc.)
     - Administrative & engine control commands (`PRAGMA`, `ATTACH`, `DETACH`, `SET`, `SHOW`, `KILL`, `SHUTDOWN`, etc.)
     - Transaction control (`COMMIT`, `ROLLBACK`, `BEGIN`, `START`, `SAVEPOINT`)
-    - Locking clauses (`FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`)
+    - Locking clauses (`FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`, `GET_LOCK()`)
     - Dollar-quoted strings (`$$...$$` in PostgreSQL)
     - Side-effecting execution functions (`SLEEP()`, `PG_SLEEP()`, `BENCHMARK()`)
     - Chained / multi-statement SQL (semicolons outside string literals)
+    - Unclosed comments (`/*`) or unmatched quotations
 
 - **Test Database Isolation & Ownership**:
-  - Test suites enforce fail-closed disposable database protection: cleanup runs only when `allow_destructive_test_cleanup` is enabled, environment is `'testing'`, host is on an approved local/container whitelist, and the database explicitly declares ownership (`'is_disposable' => true` and `'test_database_owner' => 'laravel-database-lifecycle-suite'`).
-  - Runtime socket database identities are verified via live engine queries (`SELECT DATABASE()` / `SELECT current_database()`) and fail closed if unverified.
-  - Source and destination connections must be strictly isolated to prevent unintended shared database drops.
+  - Test suites enforce fail-closed disposable database protection: cleanup runs only when `allow_destructive_test_cleanup` is enabled, environment is `'testing'`, host is on an approved local/container whitelist, and database identifiers pass strict alphanumeric validation (`^[a-zA-Z0-9_]{1,63}$`) preventing SQL injection.
+  - *Ownership flags alone are never proof*: Well-known production or system database names (`production`, `app`, `laravel`, `mysql`, `postgres`, etc.) are unconditionally rejected even if ownership flags are present.
+  - Mandatory runtime socket database identities are verified via live engine queries (`SELECT DATABASE()` / `SELECT current_database()`) and fail closed on unverified identities or socket errors.
+  - Source and destination connections must be independently provisioned and verified as isolated to prevent unintended shared database drops.
 
 ---
 

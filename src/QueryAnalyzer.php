@@ -72,8 +72,11 @@ readonly class QueryAnalyzer
             throw new InvalidArgumentException('Ambiguous SQL: Dollar-quoted strings ($$...$$) are not permitted.');
         }
 
-        // 1. Remove comments safely
+        // 1. Remove comments safely and detect unclosed block comments
         $noComments = (string) preg_replace('!/\*.*?\*/!s', ' ', $query);
+        if (str_contains($noComments, '/*')) {
+            throw new InvalidArgumentException('Malformed SQL: Unclosed block comment detected.');
+        }
         $noComments = (string) preg_replace('/(--|#).*$/m', ' ', $noComments);
         $trimmed = trim($noComments);
 
@@ -134,7 +137,7 @@ readonly class QueryAnalyzer
         $prohibitedKeywords = [
             // DDL / DML
             'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE',
-            'CREATE', 'REPLACE', 'MERGE', 'GRANT', 'REVOKE', 'LOCK',
+            'CREATE', 'REPLACE', 'MERGE', 'GRANT', 'REVOKE', 'LOCK', 'UNLOCK',
             'CALL', 'EXEC', 'EXECUTE', 'VACUUM', 'COPY', 'INTO',
             'OUTFILE', 'DUMPFILE', 'LOAD_FILE', 'ANALYZE',
             // Administrative & DB engine commands
@@ -143,13 +146,14 @@ readonly class QueryAnalyzer
             'PREPARE', 'DEALLOCATE', 'DISCARD', 'CHECKPOINT',
             'SHUTDOWN', 'KILL', 'FLUSH', 'RESET', 'PURGE', 'RELOAD',
             'LOAD', 'IMPORT', 'EXPORT', 'EXPLAIN', 'DESCRIBE', 'DESC',
+            'INSTALL', 'UNINSTALL',
             // Transaction control
             'COMMIT', 'ROLLBACK', 'BEGIN', 'START', 'SAVEPOINT', 'RELEASE',
             // Inter-process & asynchronous notifications
             'LISTEN', 'NOTIFY', 'UNLISTEN',
             // Side-effecting / dangerous execution functions
             'SLEEP', 'PG_SLEEP', 'BENCHMARK', 'LO_EXPORT', 'LO_IMPORT',
-            'SYS_EVAL', 'XP_CMDSHELL',
+            'SYS_EVAL', 'XP_CMDSHELL', 'GET_LOCK', 'RELEASE_LOCK', 'IS_FREE_LOCK',
         ];
 
         $pattern = '/\b('.implode('|', $prohibitedKeywords).')\b/i';

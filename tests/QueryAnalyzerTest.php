@@ -229,4 +229,32 @@ class QueryAnalyzerTest extends TestCase
         $this->expectExceptionMessage('Recursive CTEs (WITH RECURSIVE) are not permitted');
         $this->analyzer->analyze('WITH RECURSIVE subordinates AS (SELECT * FROM users) SELECT * FROM subordinates');
     }
+
+    public function test_it_rejects_unclosed_block_comment(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unclosed block comment detected');
+        $this->analyzer->analyze('SELECT * FROM users /* unclosed comment');
+    }
+
+    public function test_it_rejects_advisory_lock_functions(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe modifying keyword [GET_LOCK] detected');
+        $this->analyzer->analyze("SELECT GET_LOCK('test_lock', 10)");
+    }
+
+    public function test_it_rejects_unlock_tables_command(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe statement type [UNLOCK]');
+        $this->analyzer->analyze('UNLOCK TABLES');
+    }
+
+    public function test_it_preserves_supported_read_only_union_and_subqueries(): void
+    {
+        $result = $this->analyzer->analyze('SELECT id, email FROM users WHERE id IN (SELECT id FROM users WHERE id > 0) UNION ALL SELECT id, email FROM users WHERE id = 1');
+        $this->assertIsArray($result);
+        $this->assertNotEmpty($result['rows']);
+    }
 }

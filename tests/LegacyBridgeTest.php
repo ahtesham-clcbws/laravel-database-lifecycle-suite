@@ -178,21 +178,37 @@ class LegacyBridgeTest extends TestCase
 
     public function test_generated_migrations_execute_on_fresh_database(): void
     {
-        $this->bridge->reverseEngineer(['users'], $this->outputPath);
+        $this->bridge->reverseEngineer(['users', 'posts'], $this->outputPath);
         $migrationFiles = glob($this->outputPath.'/migrations/*.php');
         $this->assertNotEmpty($migrationFiles);
 
-        // Drop users table to simulate fresh database
+        // Drop tables in reverse dependency order
         Schema::dropIfExists('posts');
         Schema::dropIfExists('users');
+        $this->assertFalse(Schema::hasTable('posts'));
         $this->assertFalse(Schema::hasTable('users'));
 
-        // Require and execute migration up()
-        $migration = require $migrationFiles[0];
-        $migration->up();
+        // Locate and run migrations in dependency order (users first, then posts)
+        $userMig = \collect($migrationFiles)->first(fn ($f) => str_contains($f, 'create_users_table'));
+        $postMig = \collect($migrationFiles)->first(fn ($f) => str_contains($f, 'create_posts_table'));
 
+        $this->assertNotNull($userMig);
+        $this->assertNotNull($postMig);
+
+        $userMigration = require $userMig;
+        $userMigration->up();
         $this->assertTrue(Schema::hasTable('users'));
         $this->assertTrue(Schema::hasColumn('users', 'email'));
+
+        $postMigration = require $postMig;
+        $postMigration->up();
+        $this->assertTrue(Schema::hasTable('posts'));
+        $this->assertTrue(Schema::hasColumn('posts', 'author_id'));
+        $this->assertTrue(Schema::hasColumn('posts', 'price'));
+
+        // Clean up
+        Schema::dropIfExists('posts');
+        Schema::dropIfExists('users');
     }
 
     protected function deleteDirectory(string $dir): void

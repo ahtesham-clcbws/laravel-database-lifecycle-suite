@@ -74,7 +74,7 @@ class TestCase extends Orchestra
     /**
      * Ensure the isolated source database exists before attempting connection.
      */
-    protected function ensureSourceDatabaseExists(string $adminConnection, string $sourceConnection): void
+    public function ensureSourceDatabaseExists(string $adminConnection, string $sourceConnection): void
     {
         $sourceConfig = config("database.connections.{$sourceConnection}");
         if (! is_array($sourceConfig)) {
@@ -86,12 +86,17 @@ class TestCase extends Orchestra
             return;
         }
 
+        // Validate database identifier before constructing any SQL statement to prevent SQL injection
+        if (! preg_match('/^[a-zA-Z0-9_]{1,63}$/', $sourceDb)) {
+            throw new \RuntimeException("Destructive test database provisioning refused: Invalid database identifier [{$sourceDb}]. Only alphanumeric and underscore characters are allowed.");
+        }
+
         $driver = (string) ($sourceConfig['driver'] ?? '');
         try {
             if (in_array($driver, ['mysql', 'mariadb'], true)) {
                 DB::connection($adminConnection)->statement("CREATE DATABASE IF NOT EXISTS `{$sourceDb}`;");
             } elseif ($driver === 'pgsql') {
-                $exists = DB::connection($adminConnection)->scalar("SELECT 1 FROM pg_database WHERE datname = '{$sourceDb}'");
+                $exists = DB::connection($adminConnection)->scalar('SELECT 1 FROM pg_database WHERE datname = ?', [$sourceDb]);
                 if (! $exists) {
                     DB::connection($adminConnection)->statement("CREATE DATABASE \"{$sourceDb}\";");
                 }
@@ -181,14 +186,29 @@ class TestCase extends Orchestra
             throw new \RuntimeException("Destructive test cleanup refused: SQLite database [{$database}] lacks explicit disposable authorization or test ownership.");
         }
 
-        // 4. Reject non-local/unknown hosts for persistent engines
+        // 4. Validate database identifier to prevent SQL injection and reject malformed names
+        if (! preg_match('/^[a-zA-Z0-9_]{1,63}$/', $database)) {
+            throw new \RuntimeException("Destructive test database cleanup refused: Invalid database identifier [{$database}]. Database names must be alphanumeric and underscore only.");
+        }
+
+        // 5. Explicitly reject well-known production and system database names (flags alone are never proof)
+        $forbiddenNames = [
+            'production', 'prod', 'staging', 'stage', 'live', 'main', 'master',
+            'app', 'laravel', 'default', 'mysql', 'postgres', 'template1',
+            'information_schema', 'performance_schema', 'sys',
+        ];
+        if (in_array(strtolower($database), $forbiddenNames, true)) {
+            throw new \RuntimeException("Destructive test database cleanup refused: Database [{$database}] is a forbidden production or system database name.");
+        }
+
+        // 6. Reject non-local/unknown hosts for persistent engines
         $host = (string) ($config['host'] ?? '127.0.0.1');
         $allowedHosts = ['127.0.0.1', 'localhost', '::1', 'mysql', 'mariadb', 'postgres', 'postgresql'];
         if (! in_array(strtolower($host), $allowedHosts, true) && ! str_ends_with($host, '.internal') && ! str_ends_with($host, '.local')) {
             throw new \RuntimeException("Destructive test database cleanup refused: Host [{$host}] is not an approved local/container test host.");
         }
 
-        // 5. Explicit disposable authorization and ownership contract
+        // 7. Explicit disposable authorization and ownership contract
         $authorizedDatabases = ['lifecycle_test', 'lifecycle_source_test', 'testing'];
         if (! in_array($database, $authorizedDatabases, true)) {
             throw new \RuntimeException("Destructive test database cleanup refused: Database [{$database}] is not on the authorized disposable test database whitelist.");

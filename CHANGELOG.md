@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Production Safety Safeguards**:
   - Preflight schema validation in `SchemaSnapshotManager` before applying any restore operations.
   - Lossy schema detection rejecting generated/virtual columns, unsupported driver types, and invalid foreign key referential actions.
-  - Fail-closed test database protection in `TestCase::assertSafeTestDatabase()` with explicit disposable database authorization contract (`is_disposable => true`, `test_database_owner => 'laravel-database-lifecycle-suite'`, and database name whitelisting) and mandatory runtime socket identity verification (`SELECT DATABASE()` / `SELECT current_database()`) preventing accidental table drops.
+  - Fail-closed test database protection in `TestCase::assertSafeTestDatabase()` with strict alphanumeric database identifier validation (`^[a-zA-Z0-9_]{1,63}$`) preventing SQL injection in test database provisioning and teardown.
+  - Rejection of production and system database names (`production`, `app`, `laravel`, `mysql`, `postgres`, etc.) regardless of locally assigned ownership flags.
+  - Mandatory runtime socket identity verification (`SELECT DATABASE()` / `SELECT current_database()`) preventing accidental table drops on mismatched connections.
   - Source and destination database isolation verification (`TestCase::assertSourceAndDestinationIsolated()`) preventing shared or unisolated database cleanups.
   - Strict preservation of non-incrementing integer primary keys during snapshot restoration (auto-increment is only assigned when explicitly indicated by metadata).
   - Snapshot format versioning (`version: "1.0"`) and JSON integrity checks.
@@ -20,9 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Destructive recreation guard (`--recreate`) strictly blocked in production environments to eliminate data loss risks.
   - Full schema round-trip verification across SQLite, MySQL, MariaDB, and PostgreSQL covering foreign keys, nullability, composite indexes, and diverse column types.
   - Clear CLI and documentation warnings clarifying that schema snapshots restore structure only, not data backups.
+- **Dependency Security**:
+  - Completely removed advisory ignore policies from `composer.json`, enforcing pure native `composer audit` in CI with zero unverified vulnerability exceptions.
 - **Seeder Security & File Overwrite Protection**:
   - Enforced safe seeder scaffolds in `LegacyBridge` with complete exclusion of live database records, credentials, and sensitive data.
   - Accidental file overwrite protection across migrations, models, seeders, and factories (requires explicit `--force` to replace existing artifacts).
+  - Executable migration verification executing generated reverse-engineered migrations sequentially on fresh databases.
 - **Data Drift Hardening & Concurrency Protection**:
   - Collision-safe JSON tuple composite key serialization preventing delimiter collision across composite keys.
   - Pessimistic row locking (`lockForUpdate()`) and concurrency conflict detection in `syncRow` aborting updates when destination rows change during review, are deleted concurrently, or have competing rows inserted.
@@ -40,8 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Strictly enforced read-only execution restricted to a safe query subset (single `SELECT` and non-recursive `WITH ... (SELECT ...) SELECT ...`).
   - Explicit whitelisting of supported drivers (`sqlite`, `mysql`, `mariadb`, `pgsql`).
   - String-literal masking, backtick identifier masking, and SQL comment stripping preventing keyword obfuscation and SQL injection chaining.
-  - Structural syntax checks detecting unclosed quotes, unbalanced parentheses, control characters, and unclassified administrative commands (`PRAGMA`, `ATTACH`, `SET`, `SHOW`, etc.).
-  - Explicit rejection of PostgreSQL dollar-quoted strings (`$$...$$`), row-level locking clauses (`FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`), recursive CTEs (`WITH RECURSIVE`), and transaction control (`COMMIT`, `ROLLBACK`, `BEGIN`).
+  - Structural syntax checks detecting unclosed quotes, unbalanced parentheses, unclosed block comments (`/*`), control characters, and unclassified administrative commands (`PRAGMA`, `ATTACH`, `SET`, `SHOW`, etc.).
+  - Explicit rejection of PostgreSQL dollar-quoted strings (`$$...$$`), row-level locking clauses (`FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`, `GET_LOCK()`), recursive CTEs (`WITH RECURSIVE`), and transaction control (`COMMIT`, `ROLLBACK`, `BEGIN`).
   - Explicit rejection of side-effecting functions (`SLEEP`, `PG_SLEEP`, `BENCHMARK`), modifying CTEs, `INTO OUTFILE`, `COPY`, `ANALYZE`, and null bytes.
   - Rejection of multi-statement SQL chains (`;`) outside string literals.
   - Support for SQLite `EXPLAIN QUERY PLAN` plan interpretation, PostgreSQL format analysis, and MariaDB driver aliases.

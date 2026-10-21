@@ -48,12 +48,5 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true,
-    "config": {
-        "policy": {
-            "advisories": {
-                "ignore": ["laravel/framework"]
-            }
-        }
-    }
+    "prefer-stable": true
 }
