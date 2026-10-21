@@ -17,7 +17,10 @@ class SnapshotCommand extends Command
     /**
      * @var string
      */
-    protected $signature = 'db:snapshot {name? : Optional name for the snapshot} {--database= : The database connection to use}';
+    protected $signature = 'db:snapshot 
+                            {name? : Optional name for the snapshot} 
+                            {--database= : The database connection to use}
+                            {--force : Overwrite existing snapshot file without prompt}';
 
     /**
      * @var string
@@ -42,8 +45,9 @@ class SnapshotCommand extends Command
         }
 
         $fullPath = "{$path}/{$name}.json";
+        $force = (bool) $this->option('force');
 
-        if (file_exists($fullPath)) {
+        if (file_exists($fullPath) && ! $force) {
             if (! $this->confirm("Snapshot [{$name}] already exists. Overwrite?", false)) {
                 $this->info('Snapshot aborted.');
 

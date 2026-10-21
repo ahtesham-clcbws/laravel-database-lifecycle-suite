@@ -51,7 +51,8 @@ class LegacyBridgeCommand extends Command
                 $requested = array_map('trim', explode(',', (string) $tablesOption));
                 $tables = array_values(array_intersect($requested, $allTableNames));
             } else {
-                $tables = $allTableNames;
+                $migrationTable = (string) \config('database.migrations.table', 'migrations');
+                $tables = array_values(array_filter($allTableNames, fn ($t) => $t !== $migrationTable));
             }
 
             if (empty($tables)) {

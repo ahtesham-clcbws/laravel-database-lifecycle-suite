@@ -57,4 +57,14 @@ class SnapshotCommandTest extends TestCase
             ->expectsOutputToContain('Snapshot aborted') // Updated to match actual code
             ->assertExitCode(0);
     }
+
+    public function test_it_supports_force_option_to_overwrite_snapshot(): void
+    {
+        @mkdir($this->snapshotPath, 0755, true);
+        file_put_contents($this->snapshotPath.'/force_test.json', '{}');
+
+        $this->artisan('db:snapshot', ['name' => 'force_test', '--force' => true])
+            ->expectsOutputToContain('Snapshot saved to')
+            ->assertExitCode(0);
+    }
 }
