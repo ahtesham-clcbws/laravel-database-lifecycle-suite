@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Production Safety Safeguards**:
   - Preflight schema validation in `SchemaSnapshotManager` before applying any restore operations.
   - Lossy schema detection rejecting generated/virtual columns, unsupported driver types, and invalid foreign key referential actions.
-  - Fail-closed test database protection in `TestCase::assertSafeTestDatabase()` preventing destructive table cleanup on unapproved or non-test database hosts/names.
+  - Fail-closed test database protection in `TestCase::assertSafeTestDatabase()` with explicit disposable database authorization contract (`is_disposable => true` / database name whitelisting) and runtime socket identity verification (`SELECT DATABASE()` / `SELECT current_database()`) preventing accidental table drops.
   - Strict preservation of non-incrementing integer primary keys during snapshot restoration (auto-increment is only assigned when explicitly indicated by metadata).
   - Snapshot format versioning (`version: "1.0"`) and JSON integrity checks.
   - Path traversal protections preventing arbitrary file access via snapshot names.
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accidental file overwrite protection across migrations, models, seeders, and factories (requires explicit `--force` to replace existing artifacts).
 - **Data Drift Hardening & Concurrency Protection**:
   - Collision-safe JSON tuple composite key serialization preventing delimiter collision across composite keys.
-  - Pessimistic row locking (`lockForUpdate()`) and concurrency conflict detection in `syncRow` aborting updates when destination rows change during review or are deleted concurrently.
+  - Pessimistic row locking (`lockForUpdate()`) and concurrency conflict detection in `syncRow` aborting updates when destination rows change during review, are deleted concurrently, or have competing rows inserted.
   - Detailed diagnostic reporting via `getLastError()` on synchronization conflicts.
   - Memory-bounded comparison (`--limit`, default 1,000 records) to prevent OOM on large datasets.
   - Multi-connection validation verifying existence of tables on both source and destination connections.
@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Strictly enforced read-only execution supporting `SELECT` and non-modifying `WITH` queries.
   - Explicit whitelisting of supported drivers (`sqlite`, `mysql`, `mariadb`, `pgsql`).
   - String-literal masking, backtick identifier masking, and SQL comment stripping preventing keyword obfuscation and SQL injection chaining.
+  - Structural syntax checks detecting unclosed quotes, unbalanced parentheses, control characters, and unclassified administrative commands (`PRAGMA`, `ATTACH`, `SET`, `SHOW`, etc.).
   - Explicit rejection of modifying CTEs, `INTO OUTFILE`, `COPY`, `ANALYZE`, and null bytes.
   - Rejection of multi-statement SQL chains (`;`) outside string literals.
   - Support for SQLite `EXPLAIN QUERY PLAN` plan interpretation, PostgreSQL format analysis, and MariaDB driver aliases.
@@ -48,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Strict CI mode via `--strict` flag across audit commands.
 - **Multi-Database CI Workflows**:
   - Full matrix testing across PHP 8.2, 8.3, 8.4 and Laravel 11.x, 12.x.
+  - Dedicated deduplicated CI workflow ensuring static analysis (PHPStan) runs once.
   - Isolated database integration test jobs for MySQL 8.0, MariaDB 11.4, and PostgreSQL 16 using GitHub Actions service containers.
   - Standard `phpunit.xml.dist` tracked in Git for out-of-the-box runner execution.
   - Automated Pint formatting checks and PHPStan level 5 analysis.

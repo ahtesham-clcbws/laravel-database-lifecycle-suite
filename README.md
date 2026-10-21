@@ -210,6 +210,17 @@ php artisan db:erd --output=docs/schema.mmd
 
 ---
 
+## 🔌 Compatibility & Roadmap
+
+| Platform / Component | Supported Versions | Notes |
+| :--- | :--- | :--- |
+| **PHP** | `^8.2 \| ^8.3 \| ^8.4` | Verified in multi-version test matrix |
+| **Laravel Framework** | `^11.0 \| ^12.0` | Verified on Laravel 11.x and 12.x |
+| **Database Engines** | SQLite 3, MySQL 8.0+, MariaDB 11.4+, PostgreSQL 16+ | Integration tested via automated CI containers |
+| **Laravel 13** | Planned for `v2.0.0` | Laravel 13 dropped PHP 8.2 support (requiring PHP ^8.3) and modified DBAL schema reflection structures. To preserve strict SemVer stability and PHP 8.2 support for 1.x installations, Laravel 13 support will be released in major version 2.0.0. |
+
+---
+
 ## 🧪 Testing
 
 Execute test suite:

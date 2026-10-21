@@ -159,4 +159,32 @@ class QueryAnalyzerTest extends TestCase
         $result = $this->analyzer->analyze('SELECT "id", "email" FROM "users" WHERE "email" = \'test@example.com\'');
         $this->assertNotEmpty($result['rows']);
     }
+
+    public function test_it_rejects_unmatched_quotations(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unmatched or unclosed quotation detected');
+        $this->analyzer->analyze("SELECT * FROM users WHERE email = 'unclosed");
+    }
+
+    public function test_it_rejects_unbalanced_parentheses(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unbalanced parenthesis detected');
+        $this->analyzer->analyze('SELECT * FROM users WHERE (id = 1');
+    }
+
+    public function test_it_rejects_administrative_and_pragma_queries(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe statement type [PRAGMA]');
+        $this->analyzer->analyze('PRAGMA table_info(users)');
+    }
+
+    public function test_it_rejects_with_cte_without_terminating_select(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('WITH CTE must terminate in a read-only SELECT statement');
+        $this->analyzer->analyze('WITH temp_users AS (SELECT * FROM users)');
+    }
 }

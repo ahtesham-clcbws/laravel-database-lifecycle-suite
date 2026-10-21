@@ -63,9 +63,9 @@ readonly class QueryAnalyzer
      */
     public function validateAndSanitizeQuery(string $query): string
     {
-        // 0. Reject null bytes or binary corruption
-        if (str_contains($query, "\0")) {
-            throw new InvalidArgumentException('Unsafe query containing null bytes.');
+        // 0. Reject null bytes or unprintable control characters
+        if (str_contains($query, "\0") || preg_match('/[\x01-\x08\x0B\x0C\x0E-\x1F]/', $query)) {
+            throw new InvalidArgumentException('Unsafe query containing null bytes or unprintable control characters.');
         }
 
         // 1. Remove comments safely
@@ -79,11 +79,21 @@ readonly class QueryAnalyzer
 
         // 2. Normalize and mask string literals to prevent literal confusion
         // Mask single-quoted literals: '...' (escaped as '' or \')
-        $masked = (string) preg_replace("/'(''|\\\\'|[^'])*'/", "'__STR__'", $trimmed);
+        $masked = (string) preg_replace("/'(''|\\\\'|[^'])*'/", ' LITERALSTR ', $trimmed);
         // Mask double-quoted strings: "..."
-        $masked = (string) preg_replace('/"(""|\\\\"|[^"])*"/', '"__STR__"', $masked);
+        $masked = (string) preg_replace('/"(""|\\\\"|[^"])*"/', ' LITERALSTR ', $masked);
         // Mask backtick identifiers: `...`
-        $masked = (string) preg_replace('/`([^`]|``)*`/', '`__ID__`', $masked);
+        $masked = (string) preg_replace('/`([^`]|``)*`/', ' IDENTIFIER ', $masked);
+
+        // Reject unclosed or unmatched quotation marks
+        if (preg_match("/['\"`]/", $masked)) {
+            throw new InvalidArgumentException('Malformed SQL: Unmatched or unclosed quotation detected.');
+        }
+
+        // Reject unbalanced parentheses
+        if (substr_count($masked, '(') !== substr_count($masked, ')')) {
+            throw new InvalidArgumentException('Malformed SQL: Unbalanced parenthesis detected.');
+        }
 
         // 3. Reject multiple statements (semicolons outside string literals)
         $strippedSemicolons = rtrim($masked, "; \t\n\r\0\x0B");
@@ -101,12 +111,20 @@ readonly class QueryAnalyzer
             throw new InvalidArgumentException("Unsafe statement type [{$queryType}]. Only read-only SELECT and WITH statements are permitted.");
         }
 
-        // 5. Reject modifying DDL / DML and filesystem/execution keywords anywhere outside string literals
+        // For WITH statements, verify that the outer query is strictly a SELECT
+        if ($queryType === 'WITH' && ! preg_match('/\)\s*SELECT\b/i', $masked)) {
+            throw new InvalidArgumentException('Unsafe statement: WITH CTE must terminate in a read-only SELECT statement.');
+        }
+
+        // 5. Reject modifying DDL / DML and filesystem/execution/administrative keywords anywhere outside string literals
         $modifyingKeywords = [
             'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE',
             'CREATE', 'REPLACE', 'MERGE', 'GRANT', 'REVOKE', 'LOCK',
             'CALL', 'EXEC', 'EXECUTE', 'VACUUM', 'COPY', 'INTO',
             'OUTFILE', 'DUMPFILE', 'LOAD_FILE', 'ANALYZE',
+            'PRAGMA', 'ATTACH', 'DETACH', 'REINDEX', 'RENAME',
+            'SET', 'SHOW', 'OPTIMIZE', 'REPAIR', 'DO', 'HANDLER',
+            'PREPARE', 'DEALLOCATE',
         ];
 
         $pattern = '/\b('.implode('|', $modifyingKeywords).')\b/i';

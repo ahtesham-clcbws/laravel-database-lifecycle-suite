@@ -45,7 +45,7 @@ class TestDatabaseIsolationTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('does not contain an approved disposable test marker');
+        $this->expectExceptionMessage('lacks explicit disposable authorization');
 
         $this->assertSafeTestDatabase('unsafe_db');
     }
@@ -59,9 +59,23 @@ class TestDatabaseIsolationTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('does not contain an approved disposable test marker');
+        $this->expectExceptionMessage('lacks explicit disposable authorization');
 
         $this->assertSafeTestDatabase('generic_db');
+    }
+
+    public function test_it_rejects_when_explicit_authorization_is_disabled(): void
+    {
+        config()->set('database-lifecycle-suite.allow_destructive_test_cleanup', false);
+
+        try {
+            $this->assertSafeTestDatabase('testing');
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Explicit test cleanup authorization is disabled', $e->getMessage());
+        } finally {
+            config()->set('database-lifecycle-suite.allow_destructive_test_cleanup', true);
+        }
     }
 
     public function test_it_allows_approved_container_hosts(): void
@@ -69,7 +83,8 @@ class TestDatabaseIsolationTest extends TestCase
         config()->set('database.connections.container_mysql', [
             'driver' => 'mysql',
             'host' => 'mysql',
-            'database' => 'test_suite',
+            'database' => 'lifecycle_test',
+            'is_disposable' => true,
         ]);
 
         $this->assertSafeTestDatabase('container_mysql');

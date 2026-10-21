@@ -231,4 +231,20 @@ class DataDriftDetectorTest extends TestCase
         $this->assertNotNull($this->detector->getLastError());
         $this->assertStringContainsString('Stale baseline: destination row was deleted concurrently', $this->detector->getLastError());
     }
+
+    public function test_sync_row_detects_competing_insert(): void
+    {
+        $sourceData = ['id' => 66, 'sku' => 'COMPETING-1', 'stock' => 10];
+
+        // Simulate a competing worker inserting the row into destination before our sync arrives
+        DB::connection('testing')->table('products')->insert(['id' => 66, 'sku' => 'COMPETING-1', 'stock' => 100]);
+
+        // Attempt to sync as a missing row (expectedDestinationState is null)
+        $success = $this->detector->syncRow('products', $sourceData, 'testing', ['id'], null);
+
+        $this->assertFalse($success);
+        $this->assertNotNull($this->detector->getLastError());
+        $this->assertStringContainsString('Concurrent insertion detected', $this->detector->getLastError());
+        $this->assertEquals(100, DB::connection('testing')->table('products')->where('id', 66)->value('stock'));
+    }
 }

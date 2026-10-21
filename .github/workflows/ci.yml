@@ -183,5 +183,5 @@ jobs:
       - name: Run PHPStan (Static Analysis)
         run: vendor/bin/phpstan analyse
 
-      - name: Run PHPStan (Static Analysis)
-        run: vendor/bin/phpstan analyse
+      - name: Composer Security Audit
+        run: composer audit

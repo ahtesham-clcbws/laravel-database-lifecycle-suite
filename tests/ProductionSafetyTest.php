@@ -136,9 +136,12 @@ class ProductionSafetyTest extends TestCase
             $table->timestamps();
         });
 
+        $originalColumns = \collect(Schema::getColumns('articles'))->keyBy('name')->toArray();
+        $originalIndexes = Schema::getIndexes('articles');
+
         $definition = [
             'columns' => Schema::getColumns('articles'),
-            'indexes' => Schema::getIndexes('articles'),
+            'indexes' => $originalIndexes,
             'foreign_keys' => Schema::getForeignKeys('articles'),
         ];
 
@@ -146,12 +149,49 @@ class ProductionSafetyTest extends TestCase
         $this->assertFalse(Schema::hasTable('articles'));
 
         $restored = $manager->restoreTable('articles', $definition);
-        $this->assertTrue($restored);
+        $this->assertTrue($restored, 'Failed restoring table: '.$manager->getLastError());
         $this->assertTrue(Schema::hasTable('articles'));
-        $this->assertTrue(Schema::hasColumn('articles', 'slug'));
-        $this->assertTrue(Schema::hasColumn('articles', 'body'));
+
+        // High fidelity verification: compare restored schema metadata against original
+        $restoredColumns = \collect(Schema::getColumns('articles'))->keyBy('name')->toArray();
+        $this->assertCount(count($originalColumns), $restoredColumns);
+
+        foreach ($originalColumns as $colName => $origCol) {
+            $this->assertArrayHasKey($colName, $restoredColumns);
+            $restCol = $restoredColumns[$colName];
+            $this->assertEquals((bool) $origCol['nullable'], (bool) $restCol['nullable'], "Nullable mismatch on [{$colName}]");
+        }
+
+        // Verify index fidelity: unique slug index is reconstructed
+        $restoredIndexes = Schema::getIndexes('articles');
+        $uniqueSlug = \collect($restoredIndexes)->first(function ($idx) {
+            return ! empty($idx['unique']) && in_array('slug', (array) ($idx['columns'] ?? []), true);
+        });
+        $this->assertNotNull($uniqueSlug, 'Restored unique index on [slug] not found.');
 
         Schema::dropIfExists('articles');
+    }
+
+    public function test_snapshot_restoration_rejects_unsupported_metadata_before_changes(): void
+    {
+        $manager = new SchemaSnapshotManager;
+
+        $unsupportedDef = [
+            'columns' => [
+                ['name' => 'id', 'type_name' => 'integer', 'nullable' => false, 'auto_increment' => true],
+                ['name' => 'geo_blob', 'type_name' => 'unsupported_custom_geometry', 'nullable' => true],
+            ],
+            'indexes' => [
+                ['name' => 'pk', 'columns' => ['id'], 'primary' => true],
+            ],
+            'foreign_keys' => [],
+        ];
+
+        $this->assertFalse($manager->canRestoreWithoutLoss($unsupportedDef));
+        $restored = $manager->restoreTable('unsupported_table', $unsupportedDef);
+        $this->assertFalse($restored);
+        $this->assertFalse(Schema::hasTable('unsupported_table'));
+        $this->assertStringContainsString('lossy features', $manager->getLastError() ?? '');
     }
 
     public function test_legacy_bridge_generates_no_real_data_in_seeders(): void

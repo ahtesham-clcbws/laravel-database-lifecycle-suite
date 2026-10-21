@@ -235,11 +235,13 @@ class DataDriftDetector
                         $conflictFields = implode(', ', array_keys($conflicts));
                         throw new \RuntimeException("Concurrent modification detected: destination row was modified concurrently on columns [{$conflictFields}].");
                     }
-                }
 
-                if ($existing !== null) {
                     DB::connection($destination)->table($table)->where($conditions)->update($data);
                 } else {
+                    if ($existing !== null) {
+                        throw new \RuntimeException('Concurrent insertion detected: row was inserted on destination concurrently while synchronization was pending.');
+                    }
+
                     DB::connection($destination)->table($table)->insert($data);
                 }
             });
