@@ -48,20 +48,9 @@ class TestCase extends Orchestra
         $defaultConn = (string) config('database.default', 'testing');
         if (in_array($defaultConn, ['mysql', 'pgsql'], true)) {
             try {
-                $tables = Schema::connection($defaultConn)->getTableListing();
-                Schema::connection($defaultConn)->disableForeignKeyConstraints();
-                foreach ($tables as $table) {
-                    Schema::connection($defaultConn)->dropIfExists($table);
-                }
-                Schema::connection($defaultConn)->enableForeignKeyConstraints();
-
+                Schema::connection($defaultConn)->dropAllTables();
                 if (config('database.connections.source')) {
-                    $srcTables = Schema::connection('source')->getTableListing();
-                    Schema::connection('source')->disableForeignKeyConstraints();
-                    foreach ($srcTables as $table) {
-                        Schema::connection('source')->dropIfExists($table);
-                    }
-                    Schema::connection('source')->enableForeignKeyConstraints();
+                    Schema::connection('source')->dropAllTables();
                 }
             } catch (\Throwable) {
                 // Ignore cleanup errors on fresh databases

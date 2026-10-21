@@ -177,7 +177,14 @@ readonly class SchemaSnapshotManager
 
         if (isset($definition['indexes']) && is_array($definition['indexes'])) {
             foreach ($definition['indexes'] as $index) {
-                if (! is_array($index) || empty($index['columns']) || ! is_array($index['columns'])) {
+                if (! is_array($index)) {
+                    $issues[] = 'Malformed index metadata';
+
+                    continue;
+                }
+
+                // Non-primary secondary indexes must declare at least one column
+                if (empty($index['primary']) && (empty($index['columns']) || ! is_array($index['columns']))) {
                     $issues[] = 'Malformed index metadata';
                 }
             }
@@ -208,8 +215,17 @@ readonly class SchemaSnapshotManager
                 $primaryKeyColumns = [];
                 foreach ($definition['indexes'] ?? [] as $index) {
                     if (! empty($index['primary'])) {
-                        $primaryKeyColumns = $index['columns'] ?? [];
+                        $primaryKeyColumns = (array) ($index['columns'] ?? []);
                         break;
+                    }
+                }
+
+                // Fallback for SQLite drivers where getIndexes() reports empty columns for primary
+                if (empty($primaryKeyColumns)) {
+                    foreach ($definition['columns'] as $col) {
+                        if (! empty($col['primary'])) {
+                            $primaryKeyColumns[] = (string) $col['name'];
+                        }
                     }
                 }
 
