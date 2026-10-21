@@ -66,7 +66,8 @@ PHP;
         file_put_contents($this->modelsDir.'/SampleCastUser.php', $code);
         require_once $this->modelsDir.'/SampleCastUser.php';
 
-        $mismatches = $this->auditor->audit($this->modelsDir, 'testing');
+        $conn = (string) config('database.default');
+        $mismatches = $this->auditor->audit($this->modelsDir, $conn);
 
         $this->assertNotEmpty($mismatches);
         $this->assertEquals('status_text', $mismatches[0]['column']);
@@ -95,9 +96,10 @@ PHP;
         file_put_contents($this->modelsDir.'/SampleStrictCastUser.php', $code);
         require_once $this->modelsDir.'/SampleStrictCastUser.php';
 
+        $conn = (string) config('database.default');
         $this->artisan('db:cast-audit', [
             '--path' => $this->modelsDir,
-            '--database' => 'testing',
+            '--database' => $conn,
             '--strict' => true,
         ])
             ->expectsOutputToContain('cast inconsistencies')

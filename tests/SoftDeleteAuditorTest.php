@@ -91,7 +91,8 @@ PHP;
 
     public function test_it_detects_soft_delete_inconsistencies(): void
     {
-        $inconsistencies = $this->auditor->audit($this->modelsDir, 'testing');
+        $connection = (string) config('database.default');
+        $inconsistencies = $this->auditor->audit($this->modelsDir, $connection);
 
         $this->assertCount(2, $inconsistencies);
 
@@ -102,9 +103,10 @@ PHP;
 
     public function test_soft_delete_command_with_strict_fails_on_inconsistencies(): void
     {
+        $connection = (string) config('database.default');
         $this->artisan('db:soft-delete-audit', [
             '--path' => $this->modelsDir,
-            '--database' => 'testing',
+            '--database' => $connection,
             '--strict' => true,
         ])
             ->expectsOutputToContain('inconsistencies')

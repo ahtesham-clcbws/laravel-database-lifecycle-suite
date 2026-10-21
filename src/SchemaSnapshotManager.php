@@ -284,7 +284,25 @@ class SchemaSnapshotManager
                     }
 
                     if (array_key_exists('default', $column) && $column['default'] !== null) {
-                        $col->default($column['default']);
+                        $rawDefault = $column['default'];
+                        if (is_string($rawDefault)) {
+                            // Strip database-specific SQL casts (e.g. Postgres '0'::numeric)
+                            $cleanDefault = (string) preg_replace('/::[a-zA-Z0-9_\s]+$/', '', $rawDefault);
+                            // Strip redundant surrounding single quotes from drivers like SQLite/Postgres
+                            if (preg_match("/^'(.*)'$/s", $cleanDefault, $m)) {
+                                $cleanDefault = str_replace("''", "'", $m[1]);
+                            }
+
+                            if (is_numeric($cleanDefault)) {
+                                $col->default(str_contains($cleanDefault, '.') ? (float) $cleanDefault : (int) $cleanDefault);
+                            } elseif (strtoupper($cleanDefault) === 'NULL') {
+                                $col->default(null);
+                            } else {
+                                $col->default($cleanDefault);
+                            }
+                        } else {
+                            $col->default($rawDefault);
+                        }
                     }
                 }
 
