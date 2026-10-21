@@ -8,9 +8,10 @@ class ConnectionCheckCommandTest extends TestCase
 {
     public function test_it_runs_connection_check_command()
     {
-        $this->artisan('db:connection-check', ['--connections' => 'testing'])
+        $conn = (string) config('database.default');
+        $this->artisan('db:connection-check', ['--connections' => $conn])
             ->expectsOutputToContain('Pinging database connections')
-            ->expectsOutputToContain('testing')
+            ->expectsOutputToContain($conn)
             ->assertExitCode(0);
     }
 }

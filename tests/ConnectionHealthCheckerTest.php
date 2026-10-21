@@ -18,10 +18,11 @@ class ConnectionHealthCheckerTest extends TestCase
 
     public function test_it_checks_connection_health()
     {
-        $report = $this->checker->check(['testing']);
+        $conn = (string) config('database.default');
+        $report = $this->checker->check([$conn]);
 
         $this->assertCount(1, $report);
-        $this->assertEquals('testing', $report[0]['Connection']);
+        $this->assertEquals($conn, $report[0]['Connection']);
         $this->assertEquals('✅ Online', $report[0]['Status']);
     }
 

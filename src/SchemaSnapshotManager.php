@@ -16,11 +16,18 @@ use InvalidArgumentException;
  *
  * Manages the persistence, loading, comparison, and safe restoration of database schema states.
  */
-readonly class SchemaSnapshotManager
+class SchemaSnapshotManager
 {
     use FiltersTables, MapsDatabaseTypes;
 
     public const SUPPORTED_VERSION = '1.0';
+
+    protected ?string $lastError = null;
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
 
     /**
      * Validate that a snapshot name is safe and does not contain path traversal characters.
@@ -207,8 +214,12 @@ readonly class SchemaSnapshotManager
     public function restoreTable(string $tableName, array $definition, ?string $connection = null): bool
     {
         if (! $this->canRestoreWithoutLoss($definition)) {
+            $this->lastError = 'Table definition contains lossy features: '.implode('; ', $this->getLossyFeatures($definition));
+
             return false;
         }
+
+        $this->lastError = null;
 
         try {
             Schema::connection($connection)->create($tableName, function (Blueprint $table) use ($definition) {
@@ -310,6 +321,8 @@ readonly class SchemaSnapshotManager
 
             return true;
         } catch (Exception $e) {
+            $this->lastError = $e->getMessage();
+
             return false;
         }
     }
@@ -360,6 +373,8 @@ readonly class SchemaSnapshotManager
 
             return true;
         } catch (Exception $e) {
+            $this->lastError = $e->getMessage();
+
             return false;
         }
     }

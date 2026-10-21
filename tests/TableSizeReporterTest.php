@@ -25,7 +25,8 @@ class TableSizeReporterTest extends TestCase
 
     public function test_it_reports_table_sizes()
     {
-        $report = $this->reporter->getReport('testing');
+        $conn = (string) config('database.default');
+        $report = $this->reporter->getReport($conn);
 
         $this->assertNotEmpty($report);
         $this->assertEquals('logs', $report[0]['table']);

@@ -6,6 +6,7 @@ namespace Clcbws\DatabaseLifecycleSuite\Tests;
 
 use Clcbws\DatabaseLifecycleSuite\DatabaseLifecycleSuiteServiceProvider;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 /**
@@ -49,7 +50,7 @@ class TestCase extends Orchestra
         if (in_array($defaultConn, ['mysql', 'pgsql'], true)) {
             try {
                 Schema::connection($defaultConn)->dropAllTables();
-                if (config('database.connections.source')) {
+                if (in_array(config('database.connections.source.driver'), ['mysql', 'pgsql'], true)) {
                     Schema::connection('source')->dropAllTables();
                 }
             } catch (\Throwable) {

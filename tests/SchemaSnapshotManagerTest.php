@@ -123,7 +123,7 @@ class SchemaSnapshotManagerTest extends TestCase
 
         // Restore into 'restored_accounts'
         $restored = $this->manager->restoreTable('restored_accounts', $accountsDef);
-        $this->assertTrue($restored);
+        $this->assertTrue($restored, 'Failed restoring table: '.$this->manager->getLastError());
 
         $this->assertTrue(Schema::hasTable('restored_accounts'));
         $this->assertTrue(Schema::hasColumn('restored_accounts', 'code'));
