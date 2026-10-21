@@ -151,6 +151,11 @@ class QueryAnalyzerTest extends TestCase
 
     public function test_it_permits_double_quoted_identifiers(): void
     {
+        $driver = DB::connection()->getDriverName();
+        if (in_array($driver, ['mysql', 'mariadb'], true)) {
+            $this->markTestSkipped('MySQL/MariaDB requires ANSI_QUOTES mode to use double quotes as table identifiers.');
+        }
+
         $result = $this->analyzer->analyze('SELECT "id", "email" FROM "users" WHERE "email" = \'test@example.com\'');
         $this->assertNotEmpty($result['rows']);
     }
