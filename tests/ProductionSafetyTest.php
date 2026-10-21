@@ -172,6 +172,117 @@ class ProductionSafetyTest extends TestCase
         Schema::dropIfExists('articles');
     }
 
+    public function test_full_schema_round_trip_with_foreign_keys_and_diverse_types(): void
+    {
+        $manager = new SchemaSnapshotManager;
+
+        Schema::dropIfExists('employees');
+        Schema::dropIfExists('departments');
+
+        Schema::create('departments', function (Blueprint $table) {
+            $table->id();
+            $table->string('dept_code', 50)->unique();
+            $table->string('name', 100);
+            $table->boolean('is_active')->default(true);
+            $table->integer('headcount')->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('employees', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('department_id');
+            $table->string('email', 150)->unique();
+            $table->string('first_name', 50);
+            $table->string('last_name', 50);
+            $table->decimal('salary', 10, 2)->default(0.00);
+            $table->text('bio')->nullable();
+            $table->timestamps();
+
+            $table->index(['last_name', 'first_name']);
+            $table->foreign('department_id')->references('id')->on('departments')->onDelete('cascade');
+        });
+
+        $origDeptCols = \collect(Schema::getColumns('departments'))->keyBy('name')->toArray();
+        $origDeptIndexes = Schema::getIndexes('departments');
+        $origDeptFks = Schema::getForeignKeys('departments');
+
+        $origEmpCols = \collect(Schema::getColumns('employees'))->keyBy('name')->toArray();
+        $origEmpIndexes = Schema::getIndexes('employees');
+        $origEmpFks = Schema::getForeignKeys('employees');
+
+        $deptDef = [
+            'columns' => Schema::getColumns('departments'),
+            'indexes' => $origDeptIndexes,
+            'foreign_keys' => $origDeptFks,
+        ];
+
+        $empDef = [
+            'columns' => Schema::getColumns('employees'),
+            'indexes' => $origEmpIndexes,
+            'foreign_keys' => $origEmpFks,
+        ];
+
+        // Drop in reverse dependency order
+        Schema::drop('employees');
+        Schema::drop('departments');
+
+        $this->assertFalse(Schema::hasTable('employees'));
+        $this->assertFalse(Schema::hasTable('departments'));
+
+        // Phase 1: Restore tables
+        $this->assertTrue($manager->restoreTable('departments', $deptDef), 'Failed restoring departments: '.$manager->getLastError());
+        $this->assertTrue($manager->restoreTable('employees', $empDef), 'Failed restoring employees: '.$manager->getLastError());
+
+        // Phase 2: Restore foreign keys
+        $this->assertTrue($manager->restoreForeignKeys('employees', $empDef), 'Failed restoring foreign keys: '.$manager->getLastError());
+
+        // Assert table existence
+        $this->assertTrue(Schema::hasTable('departments'));
+        $this->assertTrue(Schema::hasTable('employees'));
+
+        // Assert column fidelity
+        $restoredDeptCols = \collect(Schema::getColumns('departments'))->keyBy('name')->toArray();
+        $this->assertCount(count($origDeptCols), $restoredDeptCols);
+        foreach ($origDeptCols as $name => $col) {
+            $this->assertArrayHasKey($name, $restoredDeptCols);
+            $this->assertEquals((bool) $col['nullable'], (bool) $restoredDeptCols[$name]['nullable'], "Dept column [{$name}] nullability mismatch");
+        }
+
+        $restoredEmpCols = \collect(Schema::getColumns('employees'))->keyBy('name')->toArray();
+        $this->assertCount(count($origEmpCols), $restoredEmpCols);
+        foreach ($origEmpCols as $name => $col) {
+            $this->assertArrayHasKey($name, $restoredEmpCols);
+            $this->assertEquals((bool) $col['nullable'], (bool) $restoredEmpCols[$name]['nullable'], "Emp column [{$name}] nullability mismatch");
+        }
+
+        // Assert index fidelity
+        $restoredEmpIndexes = Schema::getIndexes('employees');
+        $uniqueEmail = \collect($restoredEmpIndexes)->first(function ($idx) {
+            return ! empty($idx['unique']) && in_array('email', (array) ($idx['columns'] ?? []), true);
+        });
+        $this->assertNotNull($uniqueEmail, 'Restored unique index on [email] not found.');
+
+        $compositeNameIdx = \collect($restoredEmpIndexes)->first(function ($idx) {
+            $cols = (array) ($idx['columns'] ?? []);
+
+            return in_array('last_name', $cols, true) && in_array('first_name', $cols, true);
+        });
+        $this->assertNotNull($compositeNameIdx, 'Restored composite index on [last_name, first_name] not found.');
+
+        // Assert foreign key fidelity if driver supports foreign key reflection
+        $restoredEmpFks = Schema::getForeignKeys('employees');
+        if (! empty($origEmpFks)) {
+            $this->assertNotEmpty($restoredEmpFks, 'Restored foreign keys on employees table should not be empty.');
+            $deptFk = \collect($restoredEmpFks)->first(function ($fk) {
+                return ($fk['foreign_table'] ?? '') === 'departments';
+            });
+            $this->assertNotNull($deptFk, 'Restored foreign key pointing to [departments] not found.');
+        }
+
+        Schema::dropIfExists('employees');
+        Schema::dropIfExists('departments');
+    }
+
     public function test_snapshot_restoration_rejects_unsupported_metadata_before_changes(): void
     {
         $manager = new SchemaSnapshotManager;

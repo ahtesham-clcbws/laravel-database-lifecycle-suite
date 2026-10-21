@@ -219,6 +219,31 @@ php artisan db:erd --output=docs/schema.mmd
 | **Database Engines** | SQLite 3, MySQL 8.0+, MariaDB 11.4+, PostgreSQL 16+ | Integration tested via automated CI containers |
 | **Laravel 13** | Planned for `v2.0.0` | Laravel 13 dropped PHP 8.2 support (requiring PHP ^8.3) and modified DBAL schema reflection structures. To preserve strict SemVer stability and PHP 8.2 support for 1.x installations, Laravel 13 support will be released in major version 2.0.0. |
 
+### 🛡️ Safety Boundaries & Unsupported Features
+
+- **Schema Restoration Safe Boundaries**:
+  - Automatically identifies and rejects lossy or unportable features before mutating databases (virtual/generated columns, unsupported vendor geometry/blob types, and incompatible foreign key actions like `SET DEFAULT` on MySQL).
+  - Explicit integer primary keys are preserved without automatic conversion to auto-increment unless metadata specifies `auto_increment: true`.
+  - Destructive recreation (`--recreate`) is strictly blocked in production environments.
+  - *MySQL/MariaDB Implicit DDL Commits*: MySQL auto-commits active transactions upon executing DDL statements (`CREATE TABLE`, `DROP TABLE`). To prevent partial restorations, the suite executes complete preflight validation across the snapshot prior to issuing any DDL commands.
+
+- **Query Analyzer Safe Subset**:
+  - The Query Analyzer strictly enforces a safe, read-only query subset.
+  - Queries must be standard `SELECT` or non-recursive `WITH ... AS (SELECT ...) SELECT ...`.
+  - The following constructs are strictly rejected:
+    - Modifying DDL / DML (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`, `MERGE`, etc.)
+    - Administrative & engine control commands (`PRAGMA`, `ATTACH`, `DETACH`, `SET`, `SHOW`, `KILL`, `SHUTDOWN`, etc.)
+    - Transaction control (`COMMIT`, `ROLLBACK`, `BEGIN`, `START`, `SAVEPOINT`)
+    - Locking clauses (`FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`)
+    - Dollar-quoted strings (`$$...$$` in PostgreSQL)
+    - Side-effecting execution functions (`SLEEP()`, `PG_SLEEP()`, `BENCHMARK()`)
+    - Chained / multi-statement SQL (semicolons outside string literals)
+
+- **Test Database Isolation & Ownership**:
+  - Test suites enforce fail-closed disposable database protection: cleanup runs only when `allow_destructive_test_cleanup` is enabled, environment is `'testing'`, host is on an approved local/container whitelist, and the database explicitly declares ownership (`'is_disposable' => true` and `'test_database_owner' => 'laravel-database-lifecycle-suite'`).
+  - Runtime socket database identities are verified via live engine queries (`SELECT DATABASE()` / `SELECT current_database()`) and fail closed if unverified.
+  - Source and destination connections must be strictly isolated to prevent unintended shared database drops.
+
 ---
 
 ## 🧪 Testing

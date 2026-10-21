@@ -42,10 +42,12 @@ class TestDatabaseIsolationTest extends TestCase
             'driver' => 'mysql',
             'host' => '127.0.0.1',
             'database' => 'production',
+            'is_disposable' => true,
+            'test_database_owner' => 'laravel-database-lifecycle-suite',
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('lacks explicit disposable authorization');
+        $this->expectExceptionMessage('is not on the authorized disposable test database whitelist');
 
         $this->assertSafeTestDatabase('unsafe_db');
     }
@@ -56,12 +58,30 @@ class TestDatabaseIsolationTest extends TestCase
             'driver' => 'pgsql',
             'host' => 'localhost',
             'database' => 'laravel',
+            'is_disposable' => true,
+            'test_database_owner' => 'laravel-database-lifecycle-suite',
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('lacks explicit disposable authorization');
+        $this->expectExceptionMessage('is not on the authorized disposable test database whitelist');
 
         $this->assertSafeTestDatabase('generic_db');
+    }
+
+    public function test_it_rejects_missing_owner_marker(): void
+    {
+        config()->set('database.connections.unowned_db', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'database' => 'lifecycle_test',
+            'is_disposable' => true,
+            // missing 'test_database_owner'
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("lacks explicit disposable database ownership ('is_disposable' and 'test_database_owner')");
+
+        $this->assertSafeTestDatabase('unowned_db');
     }
 
     public function test_it_rejects_when_explicit_authorization_is_disabled(): void
@@ -85,9 +105,72 @@ class TestDatabaseIsolationTest extends TestCase
             'host' => 'mysql',
             'database' => 'lifecycle_test',
             'is_disposable' => true,
+            'test_database_owner' => 'laravel-database-lifecycle-suite',
         ]);
 
         $this->assertSafeTestDatabase('container_mysql');
+        $this->assertTrue(true);
+    }
+
+    public function test_it_rejects_unverified_runtime_identities_on_down_services(): void
+    {
+        config()->set('database.connections.offline_mysql', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'port' => '59999', // Port with no server
+            'database' => 'lifecycle_test',
+            'username' => 'root',
+            'password' => '',
+            'is_disposable' => true,
+            'test_database_owner' => 'laravel-database-lifecycle-suite',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Failed to verify live database identity');
+
+        // Require runtime verification must fail closed if connection cannot be verified
+        $this->assertSafeTestDatabase('offline_mysql', true);
+    }
+
+    public function test_it_rejects_unisolated_shared_source_and_destination(): void
+    {
+        config()->set('database.connections.source_shared', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'port' => '3306',
+            'database' => 'lifecycle_test',
+        ]);
+
+        config()->set('database.connections.dest_shared', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'port' => '3306',
+            'database' => 'lifecycle_test',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Source and destination isolation violation: Source and destination share the same database [lifecycle_test]');
+
+        $this->assertSourceAndDestinationIsolated('source_shared', 'dest_shared');
+    }
+
+    public function test_it_verifies_source_and_destination_isolation_success(): void
+    {
+        config()->set('database.connections.source_iso', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'port' => '3306',
+            'database' => 'lifecycle_source_test',
+        ]);
+
+        config()->set('database.connections.dest_iso', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'port' => '3306',
+            'database' => 'lifecycle_test',
+        ]);
+
+        $this->assertSourceAndDestinationIsolated('source_iso', 'dest_iso');
         $this->assertTrue(true);
     }
 }

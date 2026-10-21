@@ -63,9 +63,13 @@ readonly class QueryAnalyzer
      */
     public function validateAndSanitizeQuery(string $query): string
     {
-        // 0. Reject null bytes or unprintable control characters
+        // 0. Reject null bytes, unprintable control characters, or dollar-quoted strings
         if (str_contains($query, "\0") || preg_match('/[\x01-\x08\x0B\x0C\x0E-\x1F]/', $query)) {
             throw new InvalidArgumentException('Unsafe query containing null bytes or unprintable control characters.');
+        }
+
+        if (preg_match('/\$[a-zA-Z0-9_]*\$/', $query)) {
+            throw new InvalidArgumentException('Ambiguous SQL: Dollar-quoted strings ($$...$$) are not permitted.');
         }
 
         // 1. Remove comments safely
@@ -111,23 +115,44 @@ readonly class QueryAnalyzer
             throw new InvalidArgumentException("Unsafe statement type [{$queryType}]. Only read-only SELECT and WITH statements are permitted.");
         }
 
+        // Reject recursive CTEs
+        if (preg_match('/^\s*WITH\s+RECURSIVE\b/i', $masked)) {
+            throw new InvalidArgumentException('Ambiguous SQL: Recursive CTEs (WITH RECURSIVE) are not permitted in safe query analysis.');
+        }
+
         // For WITH statements, verify that the outer query is strictly a SELECT
         if ($queryType === 'WITH' && ! preg_match('/\)\s*SELECT\b/i', $masked)) {
             throw new InvalidArgumentException('Unsafe statement: WITH CTE must terminate in a read-only SELECT statement.');
         }
 
-        // 5. Reject modifying DDL / DML and filesystem/execution/administrative keywords anywhere outside string literals
-        $modifyingKeywords = [
+        // Reject row-level or table-level locking clauses
+        if (preg_match('/\bFOR\s+(UPDATE|SHARE|KEY\s+SHARE|NO\s+KEY\s+UPDATE)\b/i', $masked) || preg_match('/\bLOCK\s+IN\s+SHARE\s+MODE\b/i', $masked)) {
+            throw new InvalidArgumentException('Unsafe statement: Row-level or table-level locking clauses (FOR UPDATE/SHARE) are not permitted.');
+        }
+
+        // 5. Reject modifying DDL / DML and filesystem/execution/administrative/transaction keywords
+        $prohibitedKeywords = [
+            // DDL / DML
             'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'TRUNCATE',
             'CREATE', 'REPLACE', 'MERGE', 'GRANT', 'REVOKE', 'LOCK',
             'CALL', 'EXEC', 'EXECUTE', 'VACUUM', 'COPY', 'INTO',
             'OUTFILE', 'DUMPFILE', 'LOAD_FILE', 'ANALYZE',
+            // Administrative & DB engine commands
             'PRAGMA', 'ATTACH', 'DETACH', 'REINDEX', 'RENAME',
             'SET', 'SHOW', 'OPTIMIZE', 'REPAIR', 'DO', 'HANDLER',
-            'PREPARE', 'DEALLOCATE',
+            'PREPARE', 'DEALLOCATE', 'DISCARD', 'CHECKPOINT',
+            'SHUTDOWN', 'KILL', 'FLUSH', 'RESET', 'PURGE', 'RELOAD',
+            'LOAD', 'IMPORT', 'EXPORT', 'EXPLAIN', 'DESCRIBE', 'DESC',
+            // Transaction control
+            'COMMIT', 'ROLLBACK', 'BEGIN', 'START', 'SAVEPOINT', 'RELEASE',
+            // Inter-process & asynchronous notifications
+            'LISTEN', 'NOTIFY', 'UNLISTEN',
+            // Side-effecting / dangerous execution functions
+            'SLEEP', 'PG_SLEEP', 'BENCHMARK', 'LO_EXPORT', 'LO_IMPORT',
+            'SYS_EVAL', 'XP_CMDSHELL',
         ];
 
-        $pattern = '/\b('.implode('|', $modifyingKeywords).')\b/i';
+        $pattern = '/\b('.implode('|', $prohibitedKeywords).')\b/i';
         if (preg_match($pattern, $masked, $keywordMatches)) {
             $keyword = strtoupper($keywordMatches[1]);
             throw new InvalidArgumentException("Unsafe modifying keyword [{$keyword}] detected. Modifying operations are strictly prohibited.");

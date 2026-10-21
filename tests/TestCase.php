@@ -50,13 +50,88 @@ class TestCase extends Orchestra
     {
         $defaultConn = (string) config('database.default', 'testing');
         if (in_array($defaultConn, ['mysql', 'pgsql'], true)) {
-            $this->assertSafeTestDatabase($defaultConn);
+            $this->assertSafeTestDatabase($defaultConn, true);
             Schema::connection($defaultConn)->dropAllTables();
 
             $sourceDriver = (string) config('database.connections.source.driver', '');
             if (in_array($sourceDriver, ['mysql', 'pgsql'], true)) {
-                $this->assertSafeTestDatabase('source');
+                $this->ensureSourceDatabaseExists($defaultConn, 'source');
+                $this->assertSafeTestDatabase('source', true);
+                $this->assertSourceAndDestinationIsolated('source', $defaultConn);
                 Schema::connection('source')->dropAllTables();
+            }
+        }
+    }
+
+    /**
+     * Ensure the isolated source database exists before attempting connection.
+     */
+    protected function ensureSourceDatabaseExists(string $adminConnection, string $sourceConnection): void
+    {
+        $sourceConfig = config("database.connections.{$sourceConnection}");
+        if (! is_array($sourceConfig)) {
+            return;
+        }
+
+        $sourceDb = (string) ($sourceConfig['database'] ?? '');
+        if ($sourceDb === '' || $sourceDb === ':memory:') {
+            return;
+        }
+
+        $driver = (string) ($sourceConfig['driver'] ?? '');
+        try {
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
+                DB::connection($adminConnection)->statement("CREATE DATABASE IF NOT EXISTS `{$sourceDb}`;");
+            } elseif ($driver === 'pgsql') {
+                $exists = DB::connection($adminConnection)->scalar("SELECT 1 FROM pg_database WHERE datname = '{$sourceDb}'");
+                if (! $exists) {
+                    DB::connection($adminConnection)->statement("CREATE DATABASE \"{$sourceDb}\";");
+                }
+            }
+        } catch (\Throwable) {
+            // If creation fails due to permissions, downstream checks will verify identity safely
+        }
+    }
+
+    /**
+     * Verify that source and destination connections are strictly isolated databases.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertSourceAndDestinationIsolated(string $sourceConnection = 'source', ?string $destConnection = null): void
+    {
+        $destConnection = $destConnection ?: (string) config('database.default', 'testing');
+        if ($sourceConnection === $destConnection) {
+            throw new \RuntimeException("Source and destination isolation violation: Source and destination share the same connection name [{$sourceConnection}].");
+        }
+
+        $sourceConfig = config("database.connections.{$sourceConnection}");
+        $destConfig = config("database.connections.{$destConnection}");
+
+        if (! is_array($sourceConfig) || ! is_array($destConfig)) {
+            return;
+        }
+
+        $sourceDriver = (string) ($sourceConfig['driver'] ?? '');
+        $destDriver = (string) ($destConfig['driver'] ?? '');
+        $sourceDb = (string) ($sourceConfig['database'] ?? '');
+        $destDb = (string) ($destConfig['database'] ?? '');
+        $sourceHost = (string) ($sourceConfig['host'] ?? '127.0.0.1');
+        $destHost = (string) ($destConfig['host'] ?? '127.0.0.1');
+        $sourcePort = (string) ($sourceConfig['port'] ?? '');
+        $destPort = (string) ($destConfig['port'] ?? '');
+
+        // Persistent databases sharing identical host, port, and database name are NOT isolated
+        if (in_array($destDriver, ['mysql', 'mariadb', 'pgsql'], true) && in_array($sourceDriver, ['mysql', 'mariadb', 'pgsql'], true)) {
+            if (strtolower($sourceDb) === strtolower($destDb) && strtolower($sourceHost) === strtolower($destHost) && $sourcePort === $destPort) {
+                throw new \RuntimeException("Source and destination isolation violation: Source and destination share the same database [{$sourceDb}] on host [{$sourceHost}].");
+            }
+        }
+
+        // SQLite file databases
+        if ($sourceDriver === 'sqlite' && $destDriver === 'sqlite' && $sourceDb !== ':memory:' && $destDb !== ':memory:') {
+            if (realpath($sourceDb) !== false && realpath($sourceDb) === realpath($destDb)) {
+                throw new \RuntimeException("Source and destination isolation violation: Source and destination share the same SQLite file [{$sourceDb}].");
             }
         }
     }
@@ -67,7 +142,7 @@ class TestCase extends Orchestra
      *
      * @throws \RuntimeException
      */
-    public function assertSafeTestDatabase(string $connection): void
+    public function assertSafeTestDatabase(string $connection, bool $requireRuntimeVerification = false): void
     {
         // 1. Explicit cleanup authorization check
         if (! config('database-lifecycle-suite.allow_destructive_test_cleanup', false)) {
@@ -92,10 +167,10 @@ class TestCase extends Orchestra
             if ($database === ':memory:') {
                 return;
             }
-            if (! empty($config['is_disposable'])) {
+            if (! empty($config['is_disposable']) && ($config['test_database_owner'] ?? '') === 'laravel-database-lifecycle-suite') {
                 return;
             }
-            throw new \RuntimeException("Destructive test cleanup refused: SQLite database [{$database}] lacks explicit disposable authorization.");
+            throw new \RuntimeException("Destructive test cleanup refused: SQLite database [{$database}] lacks explicit disposable authorization or test ownership.");
         }
 
         // 4. Reject non-local/unknown hosts for persistent engines
@@ -105,35 +180,36 @@ class TestCase extends Orchestra
             throw new \RuntimeException("Destructive test database cleanup refused: Host [{$host}] is not an approved local/container test host.");
         }
 
-        // 5. Explicit disposable authorization: must have explicit flag OR exact name whitelist
+        // 5. Explicit disposable authorization and ownership contract
         $authorizedDatabases = ['lifecycle_test', 'lifecycle_source_test', 'testing'];
-        $isExplicitlyAuthorized = ! empty($config['is_disposable']) || in_array($database, $authorizedDatabases, true);
+        if (! in_array($database, $authorizedDatabases, true)) {
+            throw new \RuntimeException("Destructive test database cleanup refused: Database [{$database}] is not on the authorized disposable test database whitelist.");
+        }
 
-        if (! $isExplicitlyAuthorized) {
-            throw new \RuntimeException("Destructive test database cleanup refused: Database [{$database}] lacks explicit disposable authorization.");
+        $hasDisposableFlag = ! empty($config['is_disposable']);
+        $hasOwnerMarker = ($config['test_database_owner'] ?? '') === 'laravel-database-lifecycle-suite';
+        if (! $hasDisposableFlag || ! $hasOwnerMarker) {
+            throw new \RuntimeException("Destructive test database cleanup refused: Database [{$database}] lacks explicit disposable database ownership ('is_disposable' and 'test_database_owner').");
         }
 
         // 6. Runtime identity verification: ensure active socket database matches authorized database
-        try {
-            $connInstance = DB::connection($connection);
-            if ($connInstance->getRawPdo() instanceof \PDO) {
+        if ($requireRuntimeVerification) {
+            try {
+                $connInstance = DB::connection($connection);
                 if (in_array($driver, ['mysql', 'mariadb'], true)) {
                     $runtimeDb = (string) $connInstance->scalar('SELECT DATABASE()');
-                    if ($runtimeDb !== '' && strtolower($runtimeDb) !== strtolower($database)) {
-                        throw new \RuntimeException("Runtime identity mismatch: live database is [{$runtimeDb}], expected authorized database [{$database}].");
-                    }
                 } elseif ($driver === 'pgsql') {
                     $runtimeDb = (string) $connInstance->scalar('SELECT current_database()');
-                    if ($runtimeDb !== '' && strtolower($runtimeDb) !== strtolower($database)) {
-                        throw new \RuntimeException("Runtime identity mismatch: live database is [{$runtimeDb}], expected authorized database [{$database}].");
-                    }
+                } else {
+                    $runtimeDb = $database;
                 }
+
+                if ($runtimeDb === '' || strtolower($runtimeDb) !== strtolower($database)) {
+                    throw new \RuntimeException("Live database identity [{$runtimeDb}] does not match expected authorized database [{$database}].");
+                }
+            } catch (\Throwable $e) {
+                throw new \RuntimeException("Destructive test database cleanup refused: Failed to verify live database identity for [{$connection}]: ".$e->getMessage(), 0, $e);
             }
-        } catch (\Throwable $e) {
-            if ($e instanceof \RuntimeException && str_contains($e->getMessage(), 'Runtime identity mismatch')) {
-                throw $e;
-            }
-            // Ignore connection errors if database service has not yet established connection
         }
     }
 
@@ -159,16 +235,18 @@ class TestCase extends Orchestra
                 'password' => getenv('DB_PASSWORD') ?: '',
                 'prefix' => '',
                 'is_disposable' => true,
+                'test_database_owner' => 'laravel-database-lifecycle-suite',
             ]);
             $app['config']->set('database.connections.source', [
                 'driver' => 'mysql',
                 'host' => getenv('DB_HOST') ?: '127.0.0.1',
                 'port' => getenv('DB_PORT') ?: '3306',
-                'database' => getenv('DB_DATABASE') ?: 'lifecycle_test',
+                'database' => getenv('DB_SOURCE_DATABASE') ?: 'lifecycle_source_test',
                 'username' => getenv('DB_USERNAME') ?: 'root',
                 'password' => getenv('DB_PASSWORD') ?: '',
-                'prefix' => 'src_',
+                'prefix' => '',
                 'is_disposable' => true,
+                'test_database_owner' => 'laravel-database-lifecycle-suite',
             ]);
         } elseif ($dbDriver === 'pgsql') {
             $app['config']->set('database.default', 'pgsql');
@@ -181,16 +259,18 @@ class TestCase extends Orchestra
                 'password' => getenv('DB_PASSWORD') ?: '',
                 'prefix' => '',
                 'is_disposable' => true,
+                'test_database_owner' => 'laravel-database-lifecycle-suite',
             ]);
             $app['config']->set('database.connections.source', [
                 'driver' => 'pgsql',
                 'host' => getenv('DB_HOST') ?: '127.0.0.1',
                 'port' => getenv('DB_PORT') ?: '5432',
-                'database' => getenv('DB_DATABASE') ?: 'lifecycle_test',
+                'database' => getenv('DB_SOURCE_DATABASE') ?: 'lifecycle_source_test',
                 'username' => getenv('DB_USERNAME') ?: 'postgres',
                 'password' => getenv('DB_PASSWORD') ?: '',
-                'prefix' => 'src_',
+                'prefix' => '',
                 'is_disposable' => true,
+                'test_database_owner' => 'laravel-database-lifecycle-suite',
             ]);
         } else {
             $app['config']->set('database.default', 'testing');
@@ -199,12 +279,14 @@ class TestCase extends Orchestra
                 'database' => ':memory:',
                 'prefix' => '',
                 'is_disposable' => true,
+                'test_database_owner' => 'laravel-database-lifecycle-suite',
             ]);
             $app['config']->set('database.connections.source', [
                 'driver' => 'sqlite',
                 'database' => ':memory:',
                 'prefix' => '',
                 'is_disposable' => true,
+                'test_database_owner' => 'laravel-database-lifecycle-suite',
             ]);
         }
 

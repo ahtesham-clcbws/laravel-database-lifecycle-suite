@@ -187,4 +187,46 @@ class QueryAnalyzerTest extends TestCase
         $this->expectExceptionMessage('WITH CTE must terminate in a read-only SELECT statement');
         $this->analyzer->analyze('WITH temp_users AS (SELECT * FROM users)');
     }
+
+    public function test_it_rejects_dollar_quoted_strings(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Dollar-quoted strings ($$...$$) are not permitted');
+        $this->analyzer->analyze('SELECT $$dangerous$$ FROM users');
+    }
+
+    public function test_it_rejects_for_update_locking_clause(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Row-level or table-level locking clauses (FOR UPDATE/SHARE) are not permitted');
+        $this->analyzer->analyze('SELECT * FROM users WHERE id = 1 FOR UPDATE');
+    }
+
+    public function test_it_rejects_lock_in_share_mode(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Row-level or table-level locking clauses (FOR UPDATE/SHARE) are not permitted');
+        $this->analyzer->analyze('SELECT * FROM users WHERE id = 1 LOCK IN SHARE MODE');
+    }
+
+    public function test_it_rejects_transaction_control_statements(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe statement type [COMMIT]');
+        $this->analyzer->analyze('COMMIT');
+    }
+
+    public function test_it_rejects_sleep_and_benchmark_functions(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsafe modifying keyword [SLEEP] detected');
+        $this->analyzer->analyze('SELECT * FROM users WHERE id = 1 AND SLEEP(5)');
+    }
+
+    public function test_it_rejects_recursive_ctes(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Recursive CTEs (WITH RECURSIVE) are not permitted');
+        $this->analyzer->analyze('WITH RECURSIVE subordinates AS (SELECT * FROM users) SELECT * FROM subordinates');
+    }
 }

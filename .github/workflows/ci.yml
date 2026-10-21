@@ -76,12 +76,16 @@ jobs:
       - name: Install Dependencies
         run: composer update --prefer-dist --no-interaction
 
+      - name: Create Isolated Source Database
+        run: mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE IF NOT EXISTS lifecycle_source_test;"
+
       - name: Execute Tests
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_DATABASE: lifecycle_test
+          DB_SOURCE_DATABASE: lifecycle_source_test
           DB_USERNAME: root
           DB_PASSWORD: root
         run: vendor/bin/phpunit
@@ -113,12 +117,16 @@ jobs:
       - name: Install Dependencies
         run: composer update --prefer-dist --no-interaction
 
+      - name: Create Isolated Source Database
+        run: mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE IF NOT EXISTS lifecycle_source_test;"
+
       - name: Execute Tests
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_DATABASE: lifecycle_test
+          DB_SOURCE_DATABASE: lifecycle_source_test
           DB_USERNAME: root
           DB_PASSWORD: root
         run: vendor/bin/phpunit
@@ -150,12 +158,16 @@ jobs:
       - name: Install Dependencies
         run: composer update --prefer-dist --no-interaction
 
+      - name: Create Isolated Source Database
+        run: PGPASSWORD=secret psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE lifecycle_source_test;" || true
+
       - name: Execute Tests
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: lifecycle_test
+          DB_SOURCE_DATABASE: lifecycle_source_test
           DB_USERNAME: postgres
           DB_PASSWORD: secret
         run: vendor/bin/phpunit

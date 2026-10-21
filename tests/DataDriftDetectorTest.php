@@ -15,20 +15,24 @@ class DataDriftDetectorTest extends TestCase
 {
     protected DataDriftDetector $detector;
 
+    protected string $destConn;
+
+    protected string $sourceConn;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->detector = new DataDriftDetector;
-
-        // Configure a second connection for source of truth
-        config(['database.connections.source' => [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
-        ]]);
+        $this->destConn = (string) config('database.default', 'testing');
+        $this->sourceConn = 'source';
 
         // Create table on both connections
-        foreach (['testing', 'source'] as $conn) {
+        foreach ([$this->destConn, $this->sourceConn] as $conn) {
+            Schema::connection($conn)->dropIfExists('composite_strings');
+            Schema::connection($conn)->dropIfExists('role_permissions');
+            Schema::connection($conn)->dropIfExists('products');
+            Schema::connection($conn)->dropIfExists('no_keys');
+
             Schema::connection($conn)->create('products', function (Blueprint $table) {
                 $table->id();
                 $table->string('sku');
@@ -50,9 +54,10 @@ class DataDriftDetectorTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['testing', 'source'] as $conn) {
-            Schema::connection($conn)->dropIfExists('products');
+        foreach ([$this->destConn, $this->sourceConn] as $conn) {
+            Schema::connection($conn)->dropIfExists('composite_strings');
             Schema::connection($conn)->dropIfExists('role_permissions');
+            Schema::connection($conn)->dropIfExists('products');
             Schema::connection($conn)->dropIfExists('no_keys');
         }
         parent::tearDown();
@@ -60,9 +65,9 @@ class DataDriftDetectorTest extends TestCase
 
     public function test_it_detects_missing_rows(): void
     {
-        DB::connection('source')->table('products')->insert(['id' => 1, 'sku' => 'LAPTOP', 'stock' => 10]);
+        DB::connection($this->sourceConn)->table('products')->insert(['id' => 1, 'sku' => 'LAPTOP', 'stock' => 10]);
 
-        $drift = $this->detector->checkTable('products', 'source', 'testing');
+        $drift = $this->detector->checkTable('products', $this->sourceConn, $this->destConn);
 
         $this->assertCount(1, $drift['missing']);
         $firstMissing = reset($drift['missing']);
@@ -71,10 +76,10 @@ class DataDriftDetectorTest extends TestCase
 
     public function test_it_detects_differing_rows(): void
     {
-        DB::connection('source')->table('products')->insert(['id' => 1, 'sku' => 'LAPTOP', 'stock' => 10]);
-        DB::connection('testing')->table('products')->insert(['id' => 1, 'sku' => 'LAPTOP', 'stock' => 5]);
+        DB::connection($this->sourceConn)->table('products')->insert(['id' => 1, 'sku' => 'LAPTOP', 'stock' => 10]);
+        DB::connection($this->destConn)->table('products')->insert(['id' => 1, 'sku' => 'LAPTOP', 'stock' => 5]);
 
-        $drift = $this->detector->checkTable('products', 'source', 'testing');
+        $drift = $this->detector->checkTable('products', $this->sourceConn, $this->destConn);
 
         $this->assertCount(1, $drift['differing']);
         $firstDiff = reset($drift['differing']);
@@ -85,13 +90,13 @@ class DataDriftDetectorTest extends TestCase
 
     public function test_it_supports_composite_primary_keys(): void
     {
-        DB::connection('source')->table('role_permissions')->insert([
+        DB::connection($this->sourceConn)->table('role_permissions')->insert([
             'role_id' => 1,
             'permission_id' => 10,
             'granted_by' => 'admin',
         ]);
 
-        $drift = $this->detector->checkTable('role_permissions', 'source', 'testing');
+        $drift = $this->detector->checkTable('role_permissions', $this->sourceConn, $this->destConn);
         $this->assertCount(1, $drift['missing']);
 
         // Sync composite key row
@@ -99,46 +104,46 @@ class DataDriftDetectorTest extends TestCase
             'role_id' => 1,
             'permission_id' => 10,
             'granted_by' => 'admin',
-        ], 'testing', ['role_id', 'permission_id']);
+        ], $this->destConn, ['role_id', 'permission_id']);
 
         $this->assertTrue($synced);
-        $this->assertDatabaseHas('role_permissions', ['role_id' => 1, 'permission_id' => 10], 'testing');
+        $this->assertDatabaseHas('role_permissions', ['role_id' => 1, 'permission_id' => 10], $this->destConn);
     }
 
     public function test_sync_row_detects_concurrent_modification_conflict(): void
     {
-        DB::connection('source')->table('products')->insert(['id' => 50, 'sku' => 'PHONE', 'stock' => 100]);
-        DB::connection('testing')->table('products')->insert(['id' => 50, 'sku' => 'PHONE', 'stock' => 20]);
+        DB::connection($this->sourceConn)->table('products')->insert(['id' => 50, 'sku' => 'PHONE', 'stock' => 100]);
+        DB::connection($this->destConn)->table('products')->insert(['id' => 50, 'sku' => 'PHONE', 'stock' => 20]);
 
-        $drift = $this->detector->checkTable('products', 'source', 'testing');
+        $drift = $this->detector->checkTable('products', $this->sourceConn, $this->destConn);
         $firstDiff = reset($drift['differing']);
 
-        // Concurrently update live row in testing database before sync runs
-        DB::connection('testing')->table('products')->where('id', 50)->update(['stock' => 35]);
+        // Concurrently update live row in destination database before sync runs
+        DB::connection($this->destConn)->table('products')->where('id', 50)->update(['stock' => 35]);
 
         // Attempt sync with the original live state expectation
         $synced = $this->detector->syncRow(
             'products',
             $firstDiff['source'],
-            'testing',
+            $this->destConn,
             ['id'],
             $firstDiff['live']
         );
 
         // Must fail to sync because live state was modified concurrently
         $this->assertFalse($synced);
-        $this->assertEquals(35, DB::connection('testing')->table('products')->where('id', 50)->value('stock'));
+        $this->assertEquals(35, DB::connection($this->destConn)->table('products')->where('id', 50)->value('stock'));
     }
 
     public function test_composite_keys_prevent_delimiter_collisions(): void
     {
-        Schema::connection('testing')->create('composite_strings', function (Blueprint $table) {
+        Schema::connection($this->destConn)->create('composite_strings', function (Blueprint $table) {
             $table->string('tenant');
             $table->string('sub_id');
             $table->string('payload');
             $table->primary(['tenant', 'sub_id']);
         });
-        Schema::connection('source')->create('composite_strings', function (Blueprint $table) {
+        Schema::connection($this->sourceConn)->create('composite_strings', function (Blueprint $table) {
             $table->string('tenant');
             $table->string('sub_id');
             $table->string('payload');
@@ -146,53 +151,53 @@ class DataDriftDetectorTest extends TestCase
         });
 
         // Insert colliding delimiter patterns: ("a:b", "c") vs ("a", "b:c")
-        DB::connection('source')->table('composite_strings')->insert([
+        DB::connection($this->sourceConn)->table('composite_strings')->insert([
             ['tenant' => 'a:b', 'sub_id' => 'c', 'payload' => 'First'],
             ['tenant' => 'a', 'sub_id' => 'b:c', 'payload' => 'Second'],
         ]);
 
-        $drift = $this->detector->checkTable('composite_strings', 'source', 'testing');
+        $drift = $this->detector->checkTable('composite_strings', $this->sourceConn, $this->destConn);
         $this->assertCount(2, $drift['missing']);
 
         // Confirm both distinct keys exist in the missing map
         $keys = array_keys($drift['missing']);
         $this->assertCount(2, array_unique($keys));
 
-        Schema::connection('testing')->dropIfExists('composite_strings');
-        Schema::connection('source')->dropIfExists('composite_strings');
+        Schema::connection($this->destConn)->dropIfExists('composite_strings');
+        Schema::connection($this->sourceConn)->dropIfExists('composite_strings');
     }
 
     public function test_it_rejects_tables_without_primary_key(): void
     {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('lacks a primary key');
-        $this->detector->checkTable('no_keys', 'source', 'testing');
+        $this->detector->checkTable('no_keys', $this->sourceConn, $this->destConn);
     }
 
     public function test_it_rejects_missing_tables(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->detector->checkTable('non_existent_table', 'source', 'testing');
+        $this->detector->checkTable('non_existent_table', $this->sourceConn, $this->destConn);
     }
 
     public function test_it_enforces_bounded_memory_limits(): void
     {
         for ($i = 1; $i <= 20; $i++) {
-            DB::connection('source')->table('products')->insert(['id' => $i, 'sku' => "SKU-{$i}", 'stock' => $i]);
+            DB::connection($this->sourceConn)->table('products')->insert(['id' => $i, 'sku' => "SKU-{$i}", 'stock' => $i]);
         }
 
-        $drift = $this->detector->checkTable('products', 'source', 'testing', 5, 10);
+        $drift = $this->detector->checkTable('products', $this->sourceConn, $this->destConn, 5, 10);
         $this->assertTrue($drift['truncated']);
         $this->assertCount(10, $drift['missing']);
     }
 
     public function test_command_strict_mode_fails_when_drift_found(): void
     {
-        DB::connection('source')->table('products')->insert(['id' => 99, 'sku' => 'STRICT-ITEM', 'stock' => 1]);
+        DB::connection($this->sourceConn)->table('products')->insert(['id' => 99, 'sku' => 'STRICT-ITEM', 'stock' => 1]);
 
         $this->artisan('db:data-drift', [
-            '--source' => 'source',
-            '--database' => 'testing',
+            '--source' => $this->sourceConn,
+            '--database' => $this->destConn,
             '--table' => 'products',
             '--strict' => true,
         ])
@@ -202,21 +207,21 @@ class DataDriftDetectorTest extends TestCase
 
     public function test_sync_row_detects_concurrent_modification_and_reports_conflict(): void
     {
-        DB::connection('testing')->table('products')->insert(['id' => 88, 'sku' => 'CONCURRENT-1', 'stock' => 5]);
+        DB::connection($this->destConn)->table('products')->insert(['id' => 88, 'sku' => 'CONCURRENT-1', 'stock' => 5]);
 
         // Drift baseline thought live had stock 5
         $baseline = ['id' => 88, 'sku' => 'CONCURRENT-1', 'stock' => 5];
         $sourceData = ['id' => 88, 'sku' => 'CONCURRENT-1', 'stock' => 10];
 
         // Simulate concurrent modification on destination
-        DB::connection('testing')->table('products')->where('id', 88)->update(['stock' => 999]);
+        DB::connection($this->destConn)->table('products')->where('id', 88)->update(['stock' => 999]);
 
-        $success = $this->detector->syncRow('products', $sourceData, 'testing', ['id'], $baseline);
+        $success = $this->detector->syncRow('products', $sourceData, $this->destConn, ['id'], $baseline);
 
         $this->assertFalse($success);
         $this->assertNotNull($this->detector->getLastError());
         $this->assertStringContainsString('Concurrent modification detected', $this->detector->getLastError());
-        $this->assertEquals(999, DB::connection('testing')->table('products')->where('id', 88)->value('stock'));
+        $this->assertEquals(999, DB::connection($this->destConn)->table('products')->where('id', 88)->value('stock'));
     }
 
     public function test_sync_row_detects_concurrent_deletion(): void
@@ -225,7 +230,7 @@ class DataDriftDetectorTest extends TestCase
         $sourceData = ['id' => 77, 'sku' => 'DELETED-1', 'stock' => 5];
 
         // Row does not exist on destination
-        $success = $this->detector->syncRow('products', $sourceData, 'testing', ['id'], $baseline);
+        $success = $this->detector->syncRow('products', $sourceData, $this->destConn, ['id'], $baseline);
 
         $this->assertFalse($success);
         $this->assertNotNull($this->detector->getLastError());
@@ -237,14 +242,14 @@ class DataDriftDetectorTest extends TestCase
         $sourceData = ['id' => 66, 'sku' => 'COMPETING-1', 'stock' => 10];
 
         // Simulate a competing worker inserting the row into destination before our sync arrives
-        DB::connection('testing')->table('products')->insert(['id' => 66, 'sku' => 'COMPETING-1', 'stock' => 100]);
+        DB::connection($this->destConn)->table('products')->insert(['id' => 66, 'sku' => 'COMPETING-1', 'stock' => 100]);
 
         // Attempt to sync as a missing row (expectedDestinationState is null)
-        $success = $this->detector->syncRow('products', $sourceData, 'testing', ['id'], null);
+        $success = $this->detector->syncRow('products', $sourceData, $this->destConn, ['id'], null);
 
         $this->assertFalse($success);
         $this->assertNotNull($this->detector->getLastError());
         $this->assertStringContainsString('Concurrent insertion detected', $this->detector->getLastError());
-        $this->assertEquals(100, DB::connection('testing')->table('products')->where('id', 66)->value('stock'));
+        $this->assertEquals(100, DB::connection($this->destConn)->table('products')->where('id', 66)->value('stock'));
     }
 }
