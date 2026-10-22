@@ -3,7 +3,7 @@
 # Laravel Database Lifecycle Suite - Comprehensive Release Verification Runner
 # ==============================================================================
 # Usage:
-#   bash scripts/verify-release.sh [--database=sqlite|mysql|mariadb|pgsql|all] [--laravel=11|12|all]
+#   bash scripts/verify-release.sh [--database=sqlite|mysql|mariadb|pgsql|all] [--laravel=11|12|13|all]
 # ==============================================================================
 
 set -o pipefail
@@ -39,7 +39,16 @@ for arg in "$@"; do
     esac
 done
 
-RUN_ID="run_$(date -u +"%Y%m%d_%H%M%S")"
+# Concurrency Guard: prevent concurrent runs from corrupting runs and reports
+LOCK_FILE="${ROOT_DIR}/.agents/verify-release.lock"
+mkdir -p "${ROOT_DIR}/.agents"
+exec 200>"${LOCK_FILE}"
+if ! flock -n 200; then
+    echo "ERROR: Another verification run is currently in progress (Lock: ${LOCK_FILE})." >&2
+    exit 1
+fi
+
+RUN_ID="run_$(date -u +"%Y%m%d_%H%M%S")_$$"
 RUN_DIR="${ROOT_DIR}/reports/runs/${RUN_ID}"
 LATEST_DIR="${ROOT_DIR}/reports/latest"
 START_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
@@ -72,26 +81,64 @@ MYSQL_PID=""
 MYSQL_TMP=""
 MARIA_PID=""
 MARIA_TMP=""
+TMP_COMPOSER_AUDIT=""
 
 write_manifest_and_summary() {
     local END_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
     
-    # Calculate overall status if still running
+    # Calculate overall status if still running or interrupted
     if [ "${OVERALL_STATUS}" = "RUNNING" ]; then
-        if [ "${COMPOSER_VAL_STATUS}" = "FAIL" ] || [ "${COMPOSER_AUDIT_STATUS}" = "FAIL" ] || \
-           [ "${PINT_STATUS}" = "FAIL" ] || [ "${PHPSTAN_STATUS}" = "FAIL" ] || \
-           [ "${PHPUNIT_SQLITE_STATUS}" = "FAIL" ] || [ "${PHPUNIT_MYSQL_STATUS}" = "FAIL" ] || \
-           [ "${PHPUNIT_MARIADB_STATUS}" = "FAIL" ] || [ "${PHPUNIT_PGSQL_STATUS}" = "FAIL" ] || \
-           [ "${APP_INTEGRATION_L11_STATUS}" = "FAIL" ] || [ "${APP_INTEGRATION_L12_STATUS}" = "FAIL" ] || \
-           [ "${APP_INTEGRATION_L13_STATUS}" = "FAIL" ] || \
-           [ "${PHPUNIT_MYSQL_STATUS}" = "BLOCKED" ]; then
+        # Check for any failures, blocks, or non-runs in selected gates
+        local HAS_FAIL=0
+        local HAS_PARTIAL=0
+
+        for st in "${COMPOSER_VAL_STATUS}" "${COMPOSER_AUDIT_STATUS}" "${PINT_STATUS}" "${PHPSTAN_STATUS}"; do
+            if [ "$st" = "FAIL" ] || [ "$st" = "BLOCKED" ] || [ "$st" = "NOT_RUN" ]; then
+                HAS_FAIL=1
+            fi
+        done
+
+        if [ "${SELECTED_DB}" = "all" ]; then
+            for st in "${PHPUNIT_SQLITE_STATUS}" "${PHPUNIT_MYSQL_STATUS}" "${PHPUNIT_MARIADB_STATUS}" "${PHPUNIT_PGSQL_STATUS}"; do
+                if [ "$st" = "FAIL" ] || [ "$st" = "BLOCKED" ] || [ "$st" = "NOT_RUN" ] || [ "$st" = "SKIPPED" ]; then
+                    HAS_FAIL=1
+                fi
+            done
+        else
+            HAS_PARTIAL=1
+            case "${SELECTED_DB}" in
+                sqlite) [ "${PHPUNIT_SQLITE_STATUS}" != "PASS" ] && HAS_FAIL=1 ;;
+                mysql) [ "${PHPUNIT_MYSQL_STATUS}" != "PASS" ] && HAS_FAIL=1 ;;
+                mariadb) [ "${PHPUNIT_MARIADB_STATUS}" != "PASS" ] && HAS_FAIL=1 ;;
+                pgsql) [ "${PHPUNIT_PGSQL_STATUS}" != "PASS" ] && HAS_FAIL=1 ;;
+            esac
+        fi
+
+        if [ "${SELECTED_LV}" = "all" ]; then
+            for st in "${APP_INTEGRATION_L11_STATUS}" "${APP_INTEGRATION_L12_STATUS}" "${APP_INTEGRATION_L13_STATUS}"; do
+                if [ "$st" = "FAIL" ] || [ "$st" = "BLOCKED" ] || [ "$st" = "NOT_RUN" ] || [ "$st" = "SKIPPED" ]; then
+                    HAS_FAIL=1
+                fi
+            done
+        else
+            HAS_PARTIAL=1
+            case "${SELECTED_LV}" in
+                11) [ "${APP_INTEGRATION_L11_STATUS}" != "PASS" ] && HAS_FAIL=1 ;;
+                12) [ "${APP_INTEGRATION_L12_STATUS}" != "PASS" ] && HAS_FAIL=1 ;;
+                13) [ "${APP_INTEGRATION_L13_STATUS}" != "PASS" ] && HAS_FAIL=1 ;;
+            esac
+        fi
+
+        if [ $HAS_FAIL -eq 1 ]; then
             OVERALL_STATUS="FAIL"
+        elif [ $HAS_PARTIAL -eq 1 ]; then
+            OVERALL_STATUS="PARTIAL"
         else
             OVERALL_STATUS="PASS"
         fi
     fi
 
-    # Write manifest.json
+    # Write manifest.json inside RUN_DIR
     cat <<EOF > "${RUN_DIR}/manifest.json"
 {
   "run_id": "${RUN_ID}",
@@ -123,10 +170,14 @@ write_manifest_and_summary() {
   }
 }
 EOF
-    cp "${RUN_DIR}/manifest.json" "${LATEST_DIR}/manifest.json"
 
-    # Write TEST_RESULTS.md
-    cat <<EOF > "${LATEST_DIR}/TEST_RESULTS.md"
+    # ONLY update reports/latest if OVERALL_STATUS is PASS.
+    # Do NOT overwrite last successful certified report with incomplete, partial, or failed results.
+    if [ "${OVERALL_STATUS}" = "PASS" ]; then
+        cp "${RUN_DIR}/manifest.json" "${LATEST_DIR}/manifest.json"
+
+        # Write TEST_RESULTS.md
+        cat <<EOF > "${LATEST_DIR}/TEST_RESULTS.md"
 # Local Test Execution Results
 
 **Execution Run ID**: \`${RUN_ID}\`  
@@ -155,36 +206,38 @@ EOF
 
 EOF
 
-    # Dynamically update STATUS.md and SUMMARY.md
-    local AHEAD_COUNT=$(git rev-list --count master..development 2>/dev/null || echo "0")
-    local CHANGED_COUNT=$(git diff --name-only master...development 2>/dev/null | wc -l)
+        local AHEAD_COUNT=$(git rev-list --count master..development 2>/dev/null || echo "0")
+        local CHANGED_COUNT=$(git diff --name-only master...development 2>/dev/null | wc -l)
 
-    cat <<EOF > "${LATEST_DIR}/STATUS.md"
+        cat <<EOF > "${LATEST_DIR}/STATUS.md"
 # Laravel Database Lifecycle Suite
 ## Latest Development Status
 
 Date: $(date -u +"%Y-%m-%d")
 Branch: \`${GIT_BRANCH}\`
 Commit: \`${GIT_COMMIT}\`
-Verified runtime: ${PHP_VERSION}, Laravel 11.57.0 & 12.70.0, SQLite 3.x, MySQL 8.4, MariaDB 13.0, PostgreSQL 18.6
+Verified runtime: ${PHP_VERSION}, Laravel 11.57.0, 12.12.2 & 13.11.0, SQLite 3.x, MySQL 8.4, MariaDB 13.0, PostgreSQL 18.6
 
 ### Overall Stabilization
 
-Estimated completion: 100%
-
-State:
+Status:
 ${OVERALL_STATUS}
 
-### Phase Completion
+### Phase Outcomes
 
-| Phase | Completion | Status |
-|---|---|---|
-| Production safety | 100% | PASS |
-| Core engine | 100% | PASS |
-| Testing & compatibility | 100% | PASS |
-| Integration application | 100% | PASS |
-| Documentation | 100% | PASS |
-| Release verification | 100% | PASS |
+| Gate / Module | Result |
+|---|---|
+| Composer Validation | ${COMPOSER_VAL_STATUS} |
+| Security Audit | ${COMPOSER_AUDIT_STATUS} |
+| Code Formatting (Pint) | ${PINT_STATUS} |
+| Static Analysis (PHPStan) | ${PHPSTAN_STATUS} |
+| SQLite Integration | ${PHPUNIT_SQLITE_STATUS} |
+| MySQL 8.4 Integration | ${PHPUNIT_MYSQL_STATUS} |
+| MariaDB 13.0 Integration | ${PHPUNIT_MARIADB_STATUS} |
+| PostgreSQL 18.6 Integration | ${PHPUNIT_PGSQL_STATUS} |
+| Laravel 11 Application Integration | ${APP_INTEGRATION_L11_STATUS} |
+| Laravel 12 Application Integration | ${APP_INTEGRATION_L12_STATUS} |
+| Laravel 13 Application Integration | ${APP_INTEGRATION_L13_STATUS} |
 
 ### Verified Repository Metrics
 
@@ -192,25 +245,14 @@ ${OVERALL_STATUS}
 - Commits behind master: 0
 - Files changed compared to master: ${CHANGED_COUNT}
 
-### Multi-Engine Gate Outcomes
-
-- Unit & Feature (SQLite): ${PHPUNIT_SQLITE_STATUS}
-- Integration (MySQL 8.4): ${PHPUNIT_MYSQL_STATUS}
-- Integration (MariaDB 13.0): ${PHPUNIT_MARIADB_STATUS}
-- Integration (PostgreSQL 18.6): ${PHPUNIT_PGSQL_STATUS}
-- Laravel 11 Application: ${APP_INTEGRATION_L11_STATUS}
-- Laravel 12 Application: ${APP_INTEGRATION_L12_STATUS}
-- Laravel 13 Application: ${APP_INTEGRATION_L13_STATUS}
-- Dependency Audit: ${COMPOSER_AUDIT_STATUS}
-
 ### Final Certification Decision
 
-$([ "${OVERALL_STATUS}" = "PASS" ] && echo "APPROVED" || echo "BLOCKED")
+APPROVED
 
 Reason: Verification execution ID \`${RUN_ID}\` completed with overall status ${OVERALL_STATUS}.
 EOF
 
-    cat <<EOF > "${LATEST_DIR}/SUMMARY.md"
+        cat <<EOF > "${LATEST_DIR}/SUMMARY.md"
 # Release Certification Summary
 
 - **Run ID**: \`${RUN_ID}\`
@@ -219,11 +261,13 @@ EOF
 - **Timestamp**: ${END_TIMESTAMP}
 - **Overall Result**: **${OVERALL_STATUS}**
 
-All automated verification gates, multi-engine tests (SQLite, MySQL 8.4, MariaDB 13.0, PostgreSQL 18.6), unsuppressed dependency security audits, and independent clean Laravel 11 and Laravel 12 application scenarios have been executed and logged.
+All automated verification gates, multi-engine tests (SQLite, MySQL 8.4, MariaDB 13.0, PostgreSQL 18.6), unsuppressed dependency security audits, and independent clean Laravel 11, Laravel 12, and Laravel 13 application scenarios have been executed and logged.
 EOF
+    fi
 }
 
 cleanup() {
+    local EXIT_CODE=$?
     echo "Cleaning up temporary processes and data directories..."
     if [ -n "${MYSQL_PID}" ] && kill -0 "${MYSQL_PID}" 2>/dev/null; then
         kill "${MYSQL_PID}" 2>/dev/null || true
@@ -241,7 +285,21 @@ cleanup() {
         rm -rf "${MARIA_TMP}" 2>/dev/null || true
     fi
 
+    if [ -n "${TMP_COMPOSER_AUDIT}" ] && [ -f "${TMP_COMPOSER_AUDIT}" ]; then
+        rm -f "${TMP_COMPOSER_AUDIT}" 2>/dev/null || true
+    fi
+
+    # If exit code was nonzero or interrupted before reaching clean finish
+    if [ $EXIT_CODE -ne 0 ] && [ "${OVERALL_STATUS}" = "RUNNING" ]; then
+        OVERALL_STATUS="FAIL"
+    fi
+
     write_manifest_and_summary
+
+    # Ensure final process exit code matches reported status
+    if [ "${OVERALL_STATUS}" != "PASS" ]; then
+        exit 1
+    fi
 }
 
 trap cleanup EXIT INT TERM
@@ -270,13 +328,15 @@ fi
 # 2. Composer audit (Unsuppressed)
 echo "[2/8] Executing Composer Security Audit (Unsuppressed)..."
 COMPOSER_AUDIT_STATUS="RUNNING"
+TMP_COMPOSER_AUDIT=$(mktemp /tmp/composer-audit-XXXXXX.json)
 php -r '
 $c = json_decode(file_get_contents("composer.json"), true);
 unset($c["config"]["audit"]);
 unset($c["config"]["policy"]);
-file_put_contents("/tmp/unsuppressed-composer.json", json_encode($c, JSON_PRETTY_PRINT));
-'
-if COMPOSER=/tmp/unsuppressed-composer.json composer audit > "${RUN_DIR}/composer_audit.log" 2>&1; then
+file_put_contents($argv[1], json_encode($c, JSON_PRETTY_PRINT));
+' "${TMP_COMPOSER_AUDIT}"
+
+if COMPOSER="${TMP_COMPOSER_AUDIT}" composer audit > "${RUN_DIR}/composer_audit.log" 2>&1; then
     COMPOSER_AUDIT_STATUS="PASS"
     cat "${RUN_DIR}/composer_audit.log"
 else
@@ -284,7 +344,8 @@ else
     cat "${RUN_DIR}/composer_audit.log"
     exit 1
 fi
-rm -f /tmp/unsuppressed-composer.json
+rm -f "${TMP_COMPOSER_AUDIT}"
+TMP_COMPOSER_AUDIT=""
 
 # 3. Pint code style
 echo "[3/8] Running Pint Code Style Verification..."
@@ -330,18 +391,18 @@ PHPUNIT_MYSQL_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "mysql" ] || [ "${SELECTED_DB}" = "all" ]; then
     echo "[6a/8] Running Isolated MySQL 8.x Integration Tests..."
     if command -v mysqld >/dev/null 2>&1; then
-        MYSQL_TMP="/tmp/mysql-verify-${RUN_ID}"
+        MYSQL_TMP=$(mktemp -d /tmp/mysql-verify-XXXXXX)
         mkdir -p "${MYSQL_TMP}/data"
         cat << 'MYCFG' > "${MYSQL_TMP}/my.cnf"
 [mysqld]
-datadir=/tmp/mysql-verify-DATADIR/data
+datadir=DATADIR_PLACEHOLDER/data
 port=3308
-socket=/tmp/mysql-verify-DATADIR/mysql.sock
-pid-file=/tmp/mysql-verify-DATADIR/mysql.pid
+socket=DATADIR_PLACEHOLDER/mysql.sock
+pid-file=DATADIR_PLACEHOLDER/mysql.pid
 bind-address=127.0.0.1
 mysqlx=OFF
 MYCFG
-        sed -i "s|/tmp/mysql-verify-DATADIR|${MYSQL_TMP}|g" "${MYSQL_TMP}/my.cnf"
+        sed -i "s|DATADIR_PLACEHOLDER|${MYSQL_TMP}|g" "${MYSQL_TMP}/my.cnf"
 
         mysqld --defaults-file="${MYSQL_TMP}/my.cnf" --initialize-insecure >/dev/null 2>&1
         mysqld --defaults-file="${MYSQL_TMP}/my.cnf" > "${MYSQL_TMP}/mysqld.log" 2>&1 &
@@ -376,10 +437,9 @@ PHPUNIT_MARIADB_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "mariadb" ] || [ "${SELECTED_DB}" = "all" ]; then
     echo "[6b/8] Running MariaDB Multi-Engine Integration Tests..."
     if command -v mariadb-install-db >/dev/null 2>&1 && command -v mariadbd >/dev/null 2>&1; then
-        MARIA_TMP="/tmp/mariadb-verify-${RUN_ID}"
-        mkdir -p "${MARIA_TMP}"
+        MARIA_TMP=$(mktemp -d /tmp/mariadb-verify-XXXXXX)
         mariadb-install-db --datadir="${MARIA_TMP}" --auth-root-authentication-method=normal >/dev/null 2>&1
-        mariadbd --datadir="${MARIA_TMP}" --port=3307 --socket="${MARIA_TMP}/mysql.sock" --pid-file="${MARIA_TMP}/mysql.pid" >/dev/null 2>&1 &
+        mariadbd --datadir="${MARIA_TMP}" --port=3307 --socket="${MARIA_TMP}/mysql.sock" --pid-file="${MARIA_TMP}/mysql.pid" --skip-networking=0 --bind-address=127.0.0.1 >/dev/null 2>&1 &
         MARIA_PID=$!
         sleep 2
 
@@ -401,14 +461,15 @@ if [ "${SELECTED_DB}" = "mariadb" ] || [ "${SELECTED_DB}" = "all" ]; then
         rm -rf "${MARIA_TMP}" 2>/dev/null || true
         MARIA_TMP=""
     else
-        echo "MariaDB binaries not found; skipping MariaDB test."
-        PHPUNIT_MARIADB_STATUS="SKIPPED"
+        echo "MariaDB binaries not found; marking BLOCKED."
+        PHPUNIT_MARIADB_STATUS="BLOCKED"
+        exit 1
     fi
 fi
 
 PHPUNIT_PGSQL_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "pgsql" ] || [ "${SELECTED_DB}" = "all" ]; then
-    echo "[6c/8] Running PostgreSQL 18 Multi-Engine Integration Tests..."
+    echo "[6c/8] Running PostgreSQL Multi-Engine Integration Tests..."
     if psql -U "${DB_USERNAME:-ahtesham}" -h 127.0.0.1 -d lifecycle_test -c "SELECT 1;" >/dev/null 2>&1; then
         PHPUNIT_PGSQL_STATUS="RUNNING"
         if DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT=5432 DB_DATABASE=lifecycle_test DB_SOURCE_DATABASE=lifecycle_source_test DB_USERNAME="${DB_USERNAME:-ahtesham}" DB_PASSWORD="" vendor/bin/phpunit > "${RUN_DIR}/phpunit_pgsql.log" 2>&1; then
@@ -420,8 +481,9 @@ if [ "${SELECTED_DB}" = "pgsql" ] || [ "${SELECTED_DB}" = "all" ]; then
             exit 1
         fi
     else
-        echo "PostgreSQL not reachable on 127.0.0.1:5432; skipping PGSQL test."
-        PHPUNIT_PGSQL_STATUS="SKIPPED"
+        echo "PostgreSQL not reachable on 127.0.0.1:5432; marking BLOCKED."
+        PHPUNIT_PGSQL_STATUS="BLOCKED"
+        exit 1
     fi
 fi
 
@@ -466,7 +528,19 @@ if [ "${SELECTED_LV}" = "13" ] || [ "${SELECTED_LV}" = "all" ]; then
     fi
 fi
 
-echo "======================================================================"
-echo " All Quality Gates & Real App Scenarios Completed Successfully!"
-echo " Evidence persisted to: reports/latest/ and reports/runs/${RUN_ID}/"
-echo "======================================================================"
+# Check final certification condition
+if [ "${SELECTED_DB}" = "all" ] && [ "${SELECTED_LV}" = "all" ]; then
+    OVERALL_STATUS="PASS"
+    echo "======================================================================"
+    echo " All Quality Gates & Real App Scenarios Completed Successfully!"
+    echo " Certified Status: 100% PASS"
+    echo " Evidence persisted to: reports/latest/ and reports/runs/${RUN_ID}/"
+    echo "======================================================================"
+else
+    OVERALL_STATUS="PARTIAL"
+    echo "======================================================================"
+    echo " Partial Verification Completed (DB: ${SELECTED_DB}, LV: ${SELECTED_LV})."
+    echo " Status: PARTIAL (Not full release certification)."
+    echo " Evidence persisted to: reports/runs/${RUN_ID}/"
+    echo "======================================================================"
+fi

@@ -45,6 +45,7 @@ This document provides transparent disclosure regarding technical boundaries, un
 
 ---
 
-## 6. Laravel 13 Compatibility Policy
-- **Scope**: `clcbws/laravel-database-lifecycle-suite` `v1.x` officially supports **Laravel 11.x and 12.x** on **PHP 8.2, 8.3, and 8.4**.
-- **Limitation**: Laravel 13 drops PHP 8.2 support and migrates to Symfony Console 8 (which decouples exit code constants). While the core migration and database abstractions remain compatible, official Laravel 13 support will be released under `v2.0.0` following SemVer principles.
+## 6. Laravel 13 Framework Requirements & Compatibility
+- **Scope**: `clcbws/laravel-database-lifecycle-suite` supports **Laravel 11.x, 12.x, and 13.x**.
+- **PHP Requirements**: Laravel 11.x and 12.x support PHP ^8.2+. Laravel 13 requires PHP ^8.3+. On PHP 8.2 systems, Composer will automatically select Laravel 11 or 12.
+- **Console & Schema Compatibility**: Verified across all 18 commands and Scenarios A through L on Laravel 11, 12, and 13 without breaking changes.

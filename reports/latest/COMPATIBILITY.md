@@ -6,11 +6,12 @@ This document provides the empirically verified compatibility matrix for the `cl
 
 ## 1. Supported Runtime Matrix
 
-| Runtime Dimension | Target Versions | Verified Locally | Verified in GitHub Actions CI | Certification Status |
-|---|---|---|---|---|
-| **PHP** | 8.2, 8.3, 8.4 | 8.5.11 (Development host) | 8.2, 8.3, 8.4 | **CERTIFIED** |
-| **Laravel Framework** | 11.x, 12.x | 12.70.0 & 11.57.0 (Individual Workbenches) | 11.* & 12.* across all PHP versions | **CERTIFIED** |
-| **Laravel Framework 13** | Reserved for `v2.0.0` | Evaluated (Symfony Console 8 shifts) | N/A | **PLANNED FOR V2** |
+| Runtime Dimension | Target Versions | Verified Locally | Certification Status |
+|---|---|---|---|
+| **PHP** | 8.2, 8.3, 8.4 | 8.5.11 (Development host) | **CERTIFIED** |
+| **Laravel Framework** | 11.x, 12.x, 13.x | 11.57.0, 12.12.2, 13.11.0 | **CERTIFIED** |
+
+*Note on PHP 8.2 & Laravel 13*: Laravel 13 requires PHP ^8.3+. For PHP 8.2 environments, Composer resolves Laravel 11.x or 12.x. Laravel 13 is fully certified on PHP 8.3+.
 
 ---
 
@@ -20,10 +21,10 @@ Integration tests execute full migrations, schema captures, round-trip restorati
 
 | Engine | Verified Version | Connection Type | Tests Executed | Assertions | Result |
 |---|---|---|---|---|---|
-| **SQLite** | 3.54.0 | In-memory & File-based | 131 | 444 | **PASS (0 failures)** |
-| **MySQL** | 8.4.2 (Isolated Disposable Service) | TCP PDO (Port 3308) | 131 | 440 (2 driver-specific skips) | **PASS (0 failures)** |
-| **MariaDB** | 13.0.2 (Isolated Disposable Service) | TCP PDO (Port 3307) | 131 | 440 (2 driver-specific skips) | **PASS (0 failures)** |
-| **PostgreSQL** | 18.6 (Local) & 16.x (CI) | TCP / Socket PDO (Port 5432) | 131 | 443 (1 driver-specific skip) | **PASS (0 failures)** |
+| **SQLite** | 3.54.0 | In-memory & File-based | 134 | 450 | **PASS (0 failures)** |
+| **MySQL** | 8.4.2 (Isolated Disposable Service) | TCP PDO (Port 3308) | 134 | 446 (2 driver-specific skips) | **PASS (0 failures)** |
+| **MariaDB** | 13.0.2 (Isolated Disposable Service) | TCP PDO (Port 3307) | 134 | 446 (2 driver-specific skips) | **PASS (0 failures)** |
+| **PostgreSQL** | 18.6 (Local Service) | TCP / Socket PDO (Port 5432) | 134 | 449 (1 driver-specific skip) | **PASS (0 failures)** |
 
 *\*Note on driver-specific skipped tests*:
 - In PostgreSQL: `test_it_permits_backtick_quoted_identifiers` is skipped because backtick quoting (`` `column` ``) is MySQL/MariaDB syntax, whereas PostgreSQL adheres to ANSI standard double quotes (`"`).

@@ -18,7 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         php: ['8.2', '8.3', '8.4']
-        laravel: ['11.*', '12.*']
+        laravel: ['11.*', '12.*', '13.*']
+        exclude:
+          - php: '8.2'
+            laravel: '13.*'
 
     steps:
       - name: Checkout Code
@@ -35,8 +38,10 @@ jobs:
         run: |
           if [ "${{ matrix.laravel }}" = "11.*" ]; then
             composer require "orchestra/testbench:^9.0" "illuminate/support:11.*" "illuminate/database:11.*" "illuminate/console:11.*" --no-interaction --no-update
-          else
+          elif [ "${{ matrix.laravel }}" = "12.*" ]; then
             composer require "orchestra/testbench:^10.0" "illuminate/support:12.*" "illuminate/database:12.*" "illuminate/console:12.*" --no-interaction --no-update
+          else
+            composer require "orchestra/testbench:^11.0" "illuminate/support:13.*" "illuminate/database:13.*" "illuminate/console:13.*" --no-interaction --no-update
           fi
           composer update --prefer-stable --prefer-dist --no-interaction
 

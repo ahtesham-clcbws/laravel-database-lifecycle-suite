@@ -33,8 +33,8 @@
    - `LegacyBridge` generates empty, safe seeders with placeholder documentation.
    - Live application data, user credentials, tokens, and PII are never exported to generated PHP files.
 3. **Destructive Restore Protection**:
-   - Snapshot restoration is non-destructive by default and rejects dropping tables without explicit `--recreate`.
-   - In production environments, destructive table recreation requires confirmation and `--force`.
+   - Snapshot restoration is non-destructive by default and skips existing tables without dropping them.
+   - Dropping and recreating existing tables (`--recreate`) is strictly blocked in production environments. Even `--force` cannot bypass this block in production. In non-production environments, `--recreate` requires explicit user confirmation or `--force`.
 4. **Preflight Validation & Path Traversal Prevention**:
    - Snapshot restoration conducts complete preflight validation across all tables before making any database modifications.
    - Snapshot filenames are sanitized against directory traversal attacks.
