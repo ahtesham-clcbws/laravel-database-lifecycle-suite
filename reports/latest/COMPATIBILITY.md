@@ -9,7 +9,7 @@ This document provides the empirically verified compatibility matrix for the `cl
 | Runtime Dimension | Target Versions | Verified Locally | Certification Status |
 |---|---|---|---|
 | **PHP** | 8.2, 8.3, 8.4 | 8.5.11 (Development host) | **CERTIFIED** |
-| **Laravel Framework** | 11.x, 12.x, 13.x | 11.57.0, 12.12.2, 13.11.0 | **CERTIFIED** |
+| **Laravel Framework** | 11.x, 12.x, 13.x | 11.57.0, 12.70.1, 13.38.0 | **CERTIFIED** |
 
 *Note on PHP 8.2 & Laravel 13*: Laravel 13 requires PHP ^8.3+. For PHP 8.2 environments, Composer resolves Laravel 11.x or 12.x. Laravel 13 is fully certified on PHP 8.3+.
 

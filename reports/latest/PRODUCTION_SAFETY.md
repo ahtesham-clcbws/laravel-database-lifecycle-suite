@@ -21,7 +21,7 @@ This document records the adversarial safety protections, environmental gates, a
 
 ## 2. Adversarial Test Evidence Summary
 
-All 131 suite tests and 444 assertions pass with 0 failures and 0 errors:
+All 147 suite tests and 486 assertions pass with 0 failures and 0 errors:
 
 1. **Spoofed Environment Bypass Attempt**:
    - `TestCase::dropAllTables()` attempted with `APP_ENV='production'` or unverified connection configuration -> Exception thrown immediately, zero tables dropped.

@@ -118,18 +118,24 @@ class VerificationRunnerResilienceTest extends TestCase
         $mockPint = $tmpDir.'/pint';
         file_put_contents($mockPint, "#!/usr/bin/env bash\necho 'Mock Pint style violation' >&2\nexit 1\n");
         chmod($mockPint, 0755);
+        $mockAudit = $tmpDir.'/audit_ok';
+        file_put_contents($mockAudit, "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockAudit, 0755);
 
         $tmpLock = $tmpDir.'/pint.lock';
-        $output = [];
-        $exitCode = 0;
-        exec("PINT_BIN=\"{$mockPint}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec("COMPOSER_AUDIT_BIN=\"{$mockAudit}\" PINT_BIN=\"{$mockPint}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
-        unlink($mockPint);
-        @unlink($tmpLock);
-        rmdir($tmpDir);
-
-        $this->assertNotEquals(0, $exitCode);
-        $this->assertStringContainsString('Running Pint Code Style Verification...', implode("\n", $output));
+            $this->assertNotEquals(0, $exitCode);
+            $this->assertStringContainsString('Running Pint Code Style Verification...', implode("\n", $output));
+        } finally {
+            unlink($mockPint);
+            unlink($mockAudit);
+            @unlink($tmpLock);
+            rmdir($tmpDir);
+        }
     }
 
     public function test_runner_fails_on_phpstan_analysis_failure(): void
@@ -139,18 +145,24 @@ class VerificationRunnerResilienceTest extends TestCase
         $mockPhpstan = $tmpDir.'/phpstan';
         file_put_contents($mockPhpstan, "#!/usr/bin/env bash\necho 'Mock PHPStan static analysis error' >&2\nexit 1\n");
         chmod($mockPhpstan, 0755);
+        $mockAudit = $tmpDir.'/audit_ok';
+        file_put_contents($mockAudit, "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockAudit, 0755);
 
         $tmpLock = $tmpDir.'/phpstan.lock';
-        $output = [];
-        $exitCode = 0;
-        exec("PHPSTAN_BIN=\"{$mockPhpstan}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec("COMPOSER_AUDIT_BIN=\"{$mockAudit}\" PHPSTAN_BIN=\"{$mockPhpstan}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
-        unlink($mockPhpstan);
-        @unlink($tmpLock);
-        rmdir($tmpDir);
-
-        $this->assertNotEquals(0, $exitCode);
-        $this->assertStringContainsString('Running PHPStan Static Analysis', implode("\n", $output));
+            $this->assertNotEquals(0, $exitCode);
+            $this->assertStringContainsString('Running PHPStan Static Analysis', implode("\n", $output));
+        } finally {
+            unlink($mockPhpstan);
+            unlink($mockAudit);
+            @unlink($tmpLock);
+            rmdir($tmpDir);
+        }
     }
 
     public function test_runner_fails_on_phpunit_failure(): void
@@ -160,18 +172,24 @@ class VerificationRunnerResilienceTest extends TestCase
         $mockPhpunit = $tmpDir.'/phpunit';
         file_put_contents($mockPhpunit, "#!/usr/bin/env bash\necho 'Mock PHPUnit test failure' >&2\nexit 1\n");
         chmod($mockPhpunit, 0755);
+        $mockAudit = $tmpDir.'/audit_ok';
+        file_put_contents($mockAudit, "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockAudit, 0755);
 
         $tmpLock = $tmpDir.'/phpunit.lock';
-        $output = [];
-        $exitCode = 0;
-        exec("PHPUNIT_BIN=\"{$mockPhpunit}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec("COMPOSER_AUDIT_BIN=\"{$mockAudit}\" PHPUNIT_BIN=\"{$mockPhpunit}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
-        unlink($mockPhpunit);
-        @unlink($tmpLock);
-        rmdir($tmpDir);
-
-        $this->assertNotEquals(0, $exitCode);
-        $this->assertStringContainsString('Running Local PHPUnit Test Suite on SQLite...', implode("\n", $output));
+            $this->assertNotEquals(0, $exitCode);
+            $this->assertStringContainsString('Running Local PHPUnit Test Suite on SQLite...', implode("\n", $output));
+        } finally {
+            unlink($mockPhpunit);
+            unlink($mockAudit);
+            @unlink($tmpLock);
+            rmdir($tmpDir);
+        }
     }
 
     public function test_runner_fails_on_missing_database_service(): void
@@ -179,29 +197,46 @@ class VerificationRunnerResilienceTest extends TestCase
         $tmpDir = sys_get_temp_dir().'/runner-test-'.uniqid();
         mkdir($tmpDir);
         $tmpLock = $tmpDir.'/runner.lock';
+        $mockAudit = $tmpDir.'/audit_ok';
+        file_put_contents($mockAudit, "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockAudit, 0755);
 
-        $output = [];
-        $exitCode = 0;
-        exec("MYSQLD_BIN=\"/nonexistent/mysqld\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=mysql 2>&1", $output, $exitCode);
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec("COMPOSER_AUDIT_BIN=\"{$mockAudit}\" MYSQLD_BIN=\"/nonexistent/mysqld\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=mysql 2>&1", $output, $exitCode);
 
-        @unlink($tmpLock);
-        rmdir($tmpDir);
-
-        $this->assertNotEquals(0, $exitCode);
-        $this->assertStringContainsString('MySQL binaries not found', implode("\n", $output));
+            $this->assertNotEquals(0, $exitCode);
+            $this->assertStringContainsString('MySQL binaries not found', implode("\n", $output));
+        } finally {
+            unlink($mockAudit);
+            @unlink($tmpLock);
+            rmdir($tmpDir);
+        }
     }
 
     public function test_runner_fails_on_database_connection_failure(): void
     {
         $tmpLock = sys_get_temp_dir().'/pg-test-'.uniqid().'.lock';
-        $output = [];
-        $exitCode = 0;
-        // Point PostgreSQL check to an invalid port (e.g. 54321) where nothing is listening
-        exec("DB_PGSQL_PORT=54321 VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=pgsql 2>&1", $output, $exitCode);
-        @unlink($tmpLock);
+        $tmpDir = sys_get_temp_dir().'/audit-mock-'.uniqid();
+        mkdir($tmpDir);
+        $mockAudit = $tmpDir.'/audit_ok';
+        file_put_contents($mockAudit, "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockAudit, 0755);
 
-        $this->assertNotEquals(0, $exitCode);
-        $this->assertStringContainsString('PostgreSQL not reachable', implode("\n", $output));
+        try {
+            $output = [];
+            $exitCode = 0;
+            // Point PostgreSQL check to an invalid port (e.g. 54321) where nothing is listening
+            exec("COMPOSER_AUDIT_BIN=\"{$mockAudit}\" DB_PGSQL_PORT=54321 VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=pgsql 2>&1", $output, $exitCode);
+
+            $this->assertNotEquals(0, $exitCode);
+            $this->assertStringContainsString('PostgreSQL not reachable', implode("\n", $output));
+        } finally {
+            unlink($mockAudit);
+            rmdir($tmpDir);
+            @unlink($tmpLock);
+        }
     }
 
     public function test_partial_matrix_run_returns_partial_status(): void
@@ -212,6 +247,8 @@ class VerificationRunnerResilienceTest extends TestCase
 
         $mockBin = $tmpDir.'/bin';
         mkdir($mockBin);
+        file_put_contents($mockBin.'/audit', "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockBin.'/audit', 0755);
         file_put_contents($mockBin.'/pint', "#!/usr/bin/env bash\nexit 0\n");
         chmod($mockBin.'/pint', 0755);
         file_put_contents($mockBin.'/phpstan', "#!/usr/bin/env bash\nexit 0\n");
@@ -222,7 +259,7 @@ class VerificationRunnerResilienceTest extends TestCase
         $output = [];
         $exitCode = 0;
         // Run real verify-release.sh with partial selection: --database=sqlite --laravel=none
-        exec("PINT_BIN=\"{$mockBin}/pint\" PHPSTAN_BIN=\"{$mockBin}/phpstan\" PHPUNIT_BIN=\"{$mockBin}/phpunit\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite --laravel=none 2>&1", $output, $exitCode);
+        exec("COMPOSER_AUDIT_BIN=\"{$mockBin}/audit\" PINT_BIN=\"{$mockBin}/pint\" PHPSTAN_BIN=\"{$mockBin}/phpstan\" PHPUNIT_BIN=\"{$mockBin}/phpunit\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite --laravel=none 2>&1", $output, $exitCode);
 
         $joined = implode("\n", $output);
         $this->assertStringContainsString('Partial Verification Completed', $joined);
@@ -241,6 +278,7 @@ class VerificationRunnerResilienceTest extends TestCase
 
         // Clean up
         exec("rm -rf {$this->rootDir}/reports/runs/{$runId}");
+        unlink($mockBin.'/audit');
         unlink($mockBin.'/pint');
         unlink($mockBin.'/phpstan');
         unlink($mockBin.'/phpunit');
@@ -320,6 +358,9 @@ class VerificationRunnerResilienceTest extends TestCase
         $tmpDir = sys_get_temp_dir().'/fail-preserve-'.uniqid();
         mkdir($tmpDir);
         $tmpLock = $tmpDir.'/fail.lock';
+        $mockAudit = $tmpDir.'/audit_ok';
+        file_put_contents($mockAudit, "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockAudit, 0755);
         $mockPint = $tmpDir.'/pint';
         file_put_contents($mockPint, "#!/usr/bin/env bash\nexit 1\n");
         chmod($mockPint, 0755);
@@ -327,7 +368,7 @@ class VerificationRunnerResilienceTest extends TestCase
         try {
             $output = [];
             $exitCode = 0;
-            exec("PINT_BIN=\"{$mockPint}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+            exec("COMPOSER_AUDIT_BIN=\"{$mockAudit}\" PINT_BIN=\"{$mockPint}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
             $this->assertNotEquals(0, $exitCode);
 
@@ -338,6 +379,7 @@ class VerificationRunnerResilienceTest extends TestCase
             $this->assertEquals($originalData['run_id'], $currentData['run_id']);
         } finally {
             unlink($mockPint);
+            unlink($mockAudit);
             @unlink($tmpLock);
             rmdir($tmpDir);
         }
@@ -345,17 +387,31 @@ class VerificationRunnerResilienceTest extends TestCase
 
     public function test_occupied_database_port_is_detected(): void
     {
-        // 5432 is occupied by the local PostgreSQL service
+        // Dynamically bind an ephemeral server socket to guarantee port ownership across any environment
+        $socket = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
+        $this->assertIsResource($socket, "Failed to create ephemeral test socket: {$errstr}");
+        $name = stream_socket_get_name($socket, false);
+        $port = (int) explode(':', $name)[1];
+
         $tmpLock = sys_get_temp_dir().'/occupied-'.uniqid().'.lock';
+        $tmpDir = sys_get_temp_dir().'/audit-mock-'.uniqid();
+        mkdir($tmpDir);
+        $mockAudit = $tmpDir.'/audit_ok';
+        file_put_contents($mockAudit, "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockAudit, 0755);
+
         try {
             $output = [];
             $exitCode = 0;
-            // Attempt to bind MySQL check to port 5432 which is already open
-            exec("DB_MYSQL_PORT=5432 VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=mysql 2>&1", $output, $exitCode);
+            // Attempt to bind MySQL check to the port we actively hold open
+            exec("COMPOSER_AUDIT_BIN=\"{$mockAudit}\" DB_MYSQL_PORT={$port} VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=mysql 2>&1", $output, $exitCode);
 
             $this->assertNotEquals(0, $exitCode);
             $this->assertStringContainsString('already in use', implode("\n", $output));
         } finally {
+            fclose($socket);
+            unlink($mockAudit);
+            rmdir($tmpDir);
             @unlink($tmpLock);
         }
     }

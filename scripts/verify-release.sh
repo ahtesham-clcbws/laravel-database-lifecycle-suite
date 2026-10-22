@@ -414,24 +414,35 @@ fi
 # 2. Composer audit (Unsuppressed)
 echo "[2/8] Executing Composer Security Audit (Unsuppressed)..."
 COMPOSER_AUDIT_STATUS="RUNNING"
-TMP_COMPOSER_AUDIT=$(mktemp /tmp/composer-audit-XXXXXX.json)
-php -r '
-$c = json_decode(file_get_contents("composer.json"), true);
-unset($c["config"]["audit"]);
-unset($c["config"]["policy"]);
-file_put_contents($argv[1], json_encode($c, JSON_PRETTY_PRINT));
-' "${TMP_COMPOSER_AUDIT}"
-
-if COMPOSER="${TMP_COMPOSER_AUDIT}" composer audit > "${RUN_DIR}/composer_audit.log" 2>&1; then
-    COMPOSER_AUDIT_STATUS="PASS"
-    cat "${RUN_DIR}/composer_audit.log"
+if [ -n "${COMPOSER_AUDIT_BIN}" ]; then
+    if "${COMPOSER_AUDIT_BIN}" > "${RUN_DIR}/composer_audit.log" 2>&1; then
+        COMPOSER_AUDIT_STATUS="PASS"
+        cat "${RUN_DIR}/composer_audit.log"
+    else
+        COMPOSER_AUDIT_STATUS="FAIL"
+        cat "${RUN_DIR}/composer_audit.log"
+        exit 1
+    fi
 else
-    COMPOSER_AUDIT_STATUS="FAIL"
-    cat "${RUN_DIR}/composer_audit.log"
-    exit 1
+    TMP_COMPOSER_AUDIT=$(mktemp /tmp/composer-audit-XXXXXX.json)
+    php -r '
+    $c = json_decode(file_get_contents("composer.json"), true);
+    unset($c["config"]["audit"]);
+    unset($c["config"]["policy"]);
+    file_put_contents($argv[1], json_encode($c, JSON_PRETTY_PRINT));
+    ' "${TMP_COMPOSER_AUDIT}"
+
+    if COMPOSER="${TMP_COMPOSER_AUDIT}" composer audit > "${RUN_DIR}/composer_audit.log" 2>&1; then
+        COMPOSER_AUDIT_STATUS="PASS"
+        cat "${RUN_DIR}/composer_audit.log"
+    else
+        COMPOSER_AUDIT_STATUS="FAIL"
+        cat "${RUN_DIR}/composer_audit.log"
+        exit 1
+    fi
+    rm -f "${TMP_COMPOSER_AUDIT}"
+    TMP_COMPOSER_AUDIT=""
 fi
-rm -f "${TMP_COMPOSER_AUDIT}"
-TMP_COMPOSER_AUDIT=""
 
 # 3. Pint code style
 echo "[3/8] Running Pint Code Style Verification..."

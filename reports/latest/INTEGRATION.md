@@ -10,9 +10,11 @@ This report documents the end-to-end execution of all 12 operational lifecycle s
 - **Application Workbenches**:
   - Laravel 11 App: `.workbench/laravel-11/` & Reconstruction App: `.workbench/recon-laravel-11/`
   - Laravel 12 App: `.workbench/laravel-12/` & Reconstruction App: `.workbench/recon-laravel-12/`
+  - Laravel 13 App: `.workbench/laravel-13/` & Reconstruction App: `.workbench/recon-laravel-13/`
 - **Framework Versions**:
   - Laravel Framework `v11.57.0` (Laravel 11 test target)
-  - Laravel Framework `v12.70.0` (Laravel 12 test target)
+  - Laravel Framework `v12.70.1` (Laravel 12 test target)
+  - Laravel Framework `v13.38.0` (Laravel 13 test target)
 - **PHP**: `8.5.11` (with PHP 8.2, 8.3, 8.4 validated in CI matrix)
 - **Composer**: `2.10.3`
 - **Package Installation Mode**: Path Repository (`type: path`, `symlink: true`)
@@ -39,7 +41,18 @@ This report documents the end-to-end execution of all 12 operational lifecycle s
 
 ---
 
-## 3. Real Application Command Traceability
+## 4. Health-Check Findings in Test Fixtures (By Design)
+
+The real application integration scenarios evaluate the full database health scorecard (`db:lifecycle-status`), which produces an overall health score of **64%**. 
+
+> [!NOTE]
+> This is intentional and expected behaviour. The integration fixtures (`2026_10_21_000001_create_lifecycle_complex_schema.php`) deliberately inject anti-patterns to verify the auditing capabilities of the suite:
+> - **Unindexed Foreign Keys**: Injects `tasks.assigned_to` and `comments.author_id` without explicit indexes to verify that `db:index-audit` catches unindexed foreign keys.
+> - **Column Type Mismatches**: Creates `orders.user_id` as `BIGINT` and `audit_logs.user_id` as `INT` to verify cross-table type drift detection via `db:column-type-audit`.
+> - **Non-Standard Table Names**: Includes non-conventional table names (e.g., `user_activity_archive`) to verify convention detection via `db:convention-audit`.
+>
+> All 12 operational integration scenarios (**A through L**) passed with 100% success.
+
 
 All 18 package commands were tested inside the fresh applications:
 1. `db:lifecycle-status`: Evaluated health scorecard (64%-100% depending on intentional test anomalies).
