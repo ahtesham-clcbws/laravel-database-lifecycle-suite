@@ -69,7 +69,7 @@ class VerificationRunnerResilienceTest extends TestCase
         mkdir($binDir);
         $tmpLock = $tmpDir.'/custom.lock';
 
-        // Mock failing composer command
+        // Mock failing composer command via isolated PATH
         file_put_contents($binDir.'/composer', "#!/usr/bin/env bash\necho 'Mock Composer validation error' >&2\nexit 1\n");
         chmod($binDir.'/composer', 0755);
 
@@ -77,7 +77,6 @@ class VerificationRunnerResilienceTest extends TestCase
         $exitCode = 0;
         exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" PATH=\"{$binDir}:\$PATH\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
-        // Clean up mock
         unlink($binDir.'/composer');
         rmdir($binDir);
         @unlink($tmpLock);
@@ -114,22 +113,20 @@ class VerificationRunnerResilienceTest extends TestCase
 
     public function test_runner_fails_on_pint_formatting_failure(): void
     {
-        $pintPath = "{$this->rootDir}/vendor/bin/pint";
-        $backupPath = $pintPath.'.bak-test';
-        rename($pintPath, $backupPath);
-        $tmpLock = sys_get_temp_dir().'/pint-test-'.uniqid().'.lock';
+        $tmpDir = sys_get_temp_dir().'/pint-test-'.uniqid();
+        mkdir($tmpDir);
+        $mockPint = $tmpDir.'/pint';
+        file_put_contents($mockPint, "#!/usr/bin/env bash\necho 'Mock Pint style violation' >&2\nexit 1\n");
+        chmod($mockPint, 0755);
 
-        // Mock failing pint
-        file_put_contents($pintPath, "#!/usr/bin/env bash\necho 'Mock Pint style violation' >&2\nexit 1\n");
-        chmod($pintPath, 0755);
-
+        $tmpLock = $tmpDir.'/pint.lock';
         $output = [];
         $exitCode = 0;
-        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("PINT_BIN=\"{$mockPint}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
-        unlink($pintPath);
-        rename($backupPath, $pintPath);
+        unlink($mockPint);
         @unlink($tmpLock);
+        rmdir($tmpDir);
 
         $this->assertNotEquals(0, $exitCode);
         $this->assertStringContainsString('Running Pint Code Style Verification...', implode("\n", $output));
@@ -137,22 +134,20 @@ class VerificationRunnerResilienceTest extends TestCase
 
     public function test_runner_fails_on_phpstan_analysis_failure(): void
     {
-        $phpstanPath = "{$this->rootDir}/vendor/bin/phpstan";
-        $backupPath = $phpstanPath.'.bak-test';
-        rename($phpstanPath, $backupPath);
-        $tmpLock = sys_get_temp_dir().'/phpstan-test-'.uniqid().'.lock';
+        $tmpDir = sys_get_temp_dir().'/phpstan-test-'.uniqid();
+        mkdir($tmpDir);
+        $mockPhpstan = $tmpDir.'/phpstan';
+        file_put_contents($mockPhpstan, "#!/usr/bin/env bash\necho 'Mock PHPStan static analysis error' >&2\nexit 1\n");
+        chmod($mockPhpstan, 0755);
 
-        // Mock failing phpstan
-        file_put_contents($phpstanPath, "#!/usr/bin/env bash\necho 'Mock PHPStan static analysis error' >&2\nexit 1\n");
-        chmod($phpstanPath, 0755);
-
+        $tmpLock = $tmpDir.'/phpstan.lock';
         $output = [];
         $exitCode = 0;
-        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("PHPSTAN_BIN=\"{$mockPhpstan}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
-        unlink($phpstanPath);
-        rename($backupPath, $phpstanPath);
+        unlink($mockPhpstan);
         @unlink($tmpLock);
+        rmdir($tmpDir);
 
         $this->assertNotEquals(0, $exitCode);
         $this->assertStringContainsString('Running PHPStan Static Analysis', implode("\n", $output));
@@ -160,22 +155,20 @@ class VerificationRunnerResilienceTest extends TestCase
 
     public function test_runner_fails_on_phpunit_failure(): void
     {
-        $phpunitPath = "{$this->rootDir}/vendor/bin/phpunit";
-        $backupPath = $phpunitPath.'.bak-test';
-        rename($phpunitPath, $backupPath);
-        $tmpLock = sys_get_temp_dir().'/phpunit-test-'.uniqid().'.lock';
+        $tmpDir = sys_get_temp_dir().'/phpunit-test-'.uniqid();
+        mkdir($tmpDir);
+        $mockPhpunit = $tmpDir.'/phpunit';
+        file_put_contents($mockPhpunit, "#!/usr/bin/env bash\necho 'Mock PHPUnit test failure' >&2\nexit 1\n");
+        chmod($mockPhpunit, 0755);
 
-        // Mock failing phpunit
-        file_put_contents($phpunitPath, "#!/usr/bin/env bash\necho 'Mock PHPUnit test failure' >&2\nexit 1\n");
-        chmod($phpunitPath, 0755);
-
+        $tmpLock = $tmpDir.'/phpunit.lock';
         $output = [];
         $exitCode = 0;
-        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("PHPUNIT_BIN=\"{$mockPhpunit}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
-        unlink($phpunitPath);
-        rename($backupPath, $phpunitPath);
+        unlink($mockPhpunit);
         @unlink($tmpLock);
+        rmdir($tmpDir);
 
         $this->assertNotEquals(0, $exitCode);
         $this->assertStringContainsString('Running Local PHPUnit Test Suite on SQLite...', implode("\n", $output));
@@ -185,81 +178,123 @@ class VerificationRunnerResilienceTest extends TestCase
     {
         $tmpDir = sys_get_temp_dir().'/runner-test-'.uniqid();
         mkdir($tmpDir);
-        $binDir = $tmpDir.'/bin';
-        mkdir($binDir);
+        $tmpLock = $tmpDir.'/runner.lock';
 
-        // Create empty mock bin dir that shadows mysqld
         $output = [];
         $exitCode = 0;
-        exec("PATH=\"{$binDir}:/usr/bin:/bin\" bash {$this->rootDir}/scripts/verify-release.sh --database=mysql 2>&1", $output, $exitCode);
+        exec("MYSQLD_BIN=\"/nonexistent/mysqld\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=mysql 2>&1", $output, $exitCode);
 
-        rmdir($binDir);
+        @unlink($tmpLock);
         rmdir($tmpDir);
 
-        // When mysqld is not found or fails to initialize, it must return non-zero exit code
         $this->assertNotEquals(0, $exitCode);
+        $this->assertStringContainsString('MySQL binaries not found', implode("\n", $output));
     }
 
     public function test_runner_fails_on_database_connection_failure(): void
     {
-        // Provide unreachable PostgreSQL credentials
+        $tmpLock = sys_get_temp_dir().'/pg-test-'.uniqid().'.lock';
         $output = [];
         $exitCode = 0;
-        exec("DB_USERNAME=nonexistent_runner_user psql -U nonexistent_runner_user -h 127.0.0.1 -d lifecycle_test -c 'SELECT 1;' 2>&1", $pgCheck, $pgCode);
+        // Point PostgreSQL check to an invalid port (e.g. 54321) where nothing is listening
+        exec("DB_PGSQL_PORT=54321 VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=pgsql 2>&1", $output, $exitCode);
+        @unlink($tmpLock);
 
-        exec("DB_USERNAME=nonexistent_runner_user bash {$this->rootDir}/scripts/verify-release.sh --database=pgsql 2>&1", $output, $exitCode);
         $this->assertNotEquals(0, $exitCode);
+        $this->assertStringContainsString('PostgreSQL not reachable', implode("\n", $output));
     }
 
     public function test_partial_matrix_run_returns_partial_status(): void
     {
-        $runId = 'test_partial_'.uniqid();
-        // Run a lightweight test runner simulation script that computes partial status
-        $manifestDir = "{$this->rootDir}/reports/runs/{$runId}";
-        mkdir($manifestDir, 0777, true);
+        $tmpDir = sys_get_temp_dir().'/partial-runner-'.uniqid();
+        mkdir($tmpDir);
+        $tmpLock = $tmpDir.'/partial.lock';
 
-        $manifestContent = json_encode([
-            'run_id' => $runId,
-            'start_time' => '2026-10-22 00:00:00 UTC',
-            'end_time' => '2026-10-22 00:00:05 UTC',
-            'overall_status' => 'PARTIAL',
-            'results' => [
-                'composer_validate' => 'PASS',
-                'composer_audit' => 'PASS',
-                'pint' => 'PASS',
-                'phpstan' => 'PASS',
-                'phpunit_sqlite' => 'PASS',
-                'phpunit_mysql' => 'SKIPPED',
-                'phpunit_mariadb' => 'SKIPPED',
-                'phpunit_pgsql' => 'SKIPPED',
-                'app_integration_laravel_11' => 'SKIPPED',
-                'app_integration_laravel_12' => 'SKIPPED',
-                'app_integration_laravel_13' => 'SKIPPED',
-            ],
-        ], JSON_PRETTY_PRINT);
-        file_put_contents("{$manifestDir}/manifest.json", $manifestContent);
+        $mockBin = $tmpDir.'/bin';
+        mkdir($mockBin);
+        file_put_contents($mockBin.'/pint', "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockBin.'/pint', 0755);
+        file_put_contents($mockBin.'/phpstan', "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockBin.'/phpstan', 0755);
+        file_put_contents($mockBin.'/phpunit', "#!/usr/bin/env bash\nexit 0\n");
+        chmod($mockBin.'/phpunit', 0755);
 
-        $decoded = json_decode(file_get_contents("{$manifestDir}/manifest.json"), true);
-        $this->assertEquals('PARTIAL', $decoded['overall_status']);
-        $this->assertEquals('SKIPPED', $decoded['results']['phpunit_mysql']);
+        $output = [];
+        $exitCode = 0;
+        // Run real verify-release.sh with partial selection: --database=sqlite --laravel=none
+        exec("PINT_BIN=\"{$mockBin}/pint\" PHPSTAN_BIN=\"{$mockBin}/phpstan\" PHPUNIT_BIN=\"{$mockBin}/phpunit\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite --laravel=none 2>&1", $output, $exitCode);
+
+        $joined = implode("\n", $output);
+        $this->assertStringContainsString('Partial Verification Completed', $joined);
+        $this->assertStringContainsString('Status: PARTIAL', $joined);
+
+        // Verify that the manifest generated by verify-release.sh records PARTIAL
+        preg_match('/Run ID: (run_[0-9_]+)/', $joined, $matches);
+        $this->assertNotEmpty($matches, 'Could not find Run ID in runner output');
+        $runId = $matches[1];
+        $manifestFile = "{$this->rootDir}/reports/runs/{$runId}/manifest.json";
+
+        $this->assertFileExists($manifestFile);
+        $manifestData = json_decode(file_get_contents($manifestFile), true);
+        $this->assertEquals('PARTIAL', $manifestData['overall_status']);
+        $this->assertEquals('SKIPPED', $manifestData['results']['phpunit_mysql']);
 
         // Clean up
-        unlink("{$manifestDir}/manifest.json");
-        rmdir($manifestDir);
+        exec("rm -rf {$this->rootDir}/reports/runs/{$runId}");
+        unlink($mockBin.'/pint');
+        unlink($mockBin.'/phpstan');
+        unlink($mockBin.'/phpunit');
+        rmdir($mockBin);
+        @unlink($tmpLock);
+        rmdir($tmpDir);
     }
 
     public function test_interrupted_execution_returns_failure(): void
     {
-        $output = [];
-        $exitCode = 0;
-        // Simulate execution interrupt trapped by SIGINT
-        exec("bash -c '
-            trap \"echo Trapped interrupt; exit 1\" INT
-            kill -INT \$\$
-        ' 2>&1", $output, $exitCode);
+        $tmpDir = sys_get_temp_dir().'/interrupt-test-'.uniqid();
+        mkdir($tmpDir);
+        $tmpLock = $tmpDir.'/interrupt.lock';
 
+        $mockPhpunit = $tmpDir.'/slow_phpunit';
+        // A mock phpunit that sleeps to simulate a long running test phase
+        file_put_contents($mockPhpunit, "#!/usr/bin/env bash\nsleep 10\nexit 0\n");
+        chmod($mockPhpunit, 0755);
+
+        $pipes = [];
+        $cmd = ['bash', "{$this->rootDir}/scripts/verify-release.sh", '--database=sqlite', '--laravel=none'];
+        $env = array_merge($_ENV, [
+            'PHPUNIT_BIN' => $mockPhpunit,
+            'VERIFY_LOCK_FILE' => $tmpLock,
+        ]);
+
+        $proc = proc_open($cmd, [
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes, $this->rootDir, $env);
+
+        $this->assertIsResource($proc);
+
+        // Wait briefly for runner to start executing
+        usleep(300000); // 300ms
+
+        // Send SIGTERM to real verify-release.sh runner process
+        proc_terminate($proc, SIGTERM);
+
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $exitCode = proc_close($proc);
+        $combinedOutput = $stdout."\n".$stderr;
+
+        // Clean up
+        @unlink($mockPhpunit);
+        @unlink($tmpLock);
+        rmdir($tmpDir);
+
+        // Assert process exited with non-zero failure code
         $this->assertNotEquals(0, $exitCode);
-        $this->assertStringContainsString('Trapped interrupt', implode("\n", $output));
     }
 
     public function test_invalid_json_manifest_is_detected(): void

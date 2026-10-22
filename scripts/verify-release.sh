@@ -24,16 +24,16 @@ for arg in "$@"; do
             echo "ERROR: Invalid database target: ${arg#*=}. Allowed: sqlite, mysql, mariadb, pgsql, all" >&2
             exit 1
             ;;
-        --laravel=11|--laravel=12|--laravel=13|--laravel=all)
+        --laravel=11|--laravel=12|--laravel=13|--laravel=all|--laravel=none)
             SELECTED_LV="${arg#*=}"
             ;;
         --laravel=*)
-            echo "ERROR: Invalid Laravel target: ${arg#*=}. Allowed: 11, 12, 13, all" >&2
+            echo "ERROR: Invalid Laravel target: ${arg#*=}. Allowed: 11, 12, 13, all, none" >&2
             exit 1
             ;;
         *)
             echo "ERROR: Unknown argument: $arg" >&2
-            echo "Usage: $0 [--database=sqlite|mysql|mariadb|pgsql|all] [--laravel=11|12|13|all]" >&2
+            echo "Usage: $0 [--database=sqlite|mysql|mariadb|pgsql|all] [--laravel=11|12|13|all|none]" >&2
             exit 1
             ;;
     esac
@@ -75,6 +75,26 @@ GIT_COMMIT=$(git rev-parse HEAD)
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 GIT_WORKTREE_DIRTY=$(git status --porcelain | wc -l)
 GIT_COMMIT_COUNT=$(git rev-list --count HEAD)
+
+# Configurable ports
+DB_MYSQL_PORT="${DB_MYSQL_PORT:-3308}"
+DB_MARIA_PORT="${DB_MARIA_PORT:-3307}"
+DB_PGSQL_PORT="${DB_PGSQL_PORT:-5432}"
+
+# Dynamic runtime engine versions
+SQLITE_VERSION=$(php -r 'echo (new SQLite3(":memory:"))->version()["versionString"];' 2>/dev/null || echo "3.x")
+MYSQL_VERSION="Not executed"
+MARIA_VERSION="Not executed"
+PGSQL_VERSION="Not executed"
+L11_VERSION="Not executed"
+L12_VERSION="Not executed"
+L13_VERSION="Not executed"
+
+# Configurable binary paths (prevents altering vendor/bin in tests)
+PINT_BIN="${PINT_BIN:-vendor/bin/pint}"
+PHPSTAN_BIN="${PHPSTAN_BIN:-vendor/bin/phpstan}"
+PHPUNIT_BIN="${PHPUNIT_BIN:-vendor/bin/phpunit}"
+MYSQLD_BIN="${MYSQLD_BIN:-mysqld}"
 
 # Ephemeral process PIDs & directories
 MYSQL_PID=""
@@ -153,7 +173,14 @@ write_manifest_and_summary() {
   },
   "runtime": {
     "php": "${PHP_VERSION}",
-    "composer": "${COMPOSER_VERSION}"
+    "composer": "${COMPOSER_VERSION}",
+    "sqlite": "${SQLITE_VERSION}",
+    "mysql": "${MYSQL_VERSION}",
+    "mariadb": "${MARIA_VERSION}",
+    "postgresql": "${PGSQL_VERSION}",
+    "laravel_11": "${L11_VERSION}",
+    "laravel_12": "${L12_VERSION}",
+    "laravel_13": "${L13_VERSION}"
   },
   "results": {
     "composer_validate": "${COMPOSER_VAL_STATUS}",
@@ -196,13 +223,13 @@ EOF
 | Security Audit | Dependencies (Unsuppressed) | **${COMPOSER_AUDIT_STATUS}** | composer_audit.log |
 | Pint Code Style | PSR-12 / Laravel Standards | **${PINT_STATUS}** | pint.log |
 | Static Analysis | PHPStan Level 5 | **${PHPSTAN_STATUS}** | phpstan.log |
-| Unit & Feature Tests | SQLite In-Memory | **${PHPUNIT_SQLITE_STATUS}** | phpunit_sqlite.log |
-| Integration Tests | MySQL 8.4 Isolated Service | **${PHPUNIT_MYSQL_STATUS}** | phpunit_mysql.log |
-| Integration Tests | MariaDB 13.0 Isolated Service | **${PHPUNIT_MARIADB_STATUS}** | phpunit_mariadb.log |
-| Integration Tests | PostgreSQL 18.6 Service | **${PHPUNIT_PGSQL_STATUS}** | phpunit_pgsql.log |
-| Application Integration | Laravel 11.x Full Matrix | **${APP_INTEGRATION_L11_STATUS}** | laravel11_integration.log |
-| Application Integration | Laravel 12.x Full Matrix | **${APP_INTEGRATION_L12_STATUS}** | laravel12_integration.log |
-| Application Integration | Laravel 13.x Full Matrix | **${APP_INTEGRATION_L13_STATUS}** | laravel13_integration.log |
+| Unit & Feature Tests | SQLite In-Memory (${SQLITE_VERSION}) | **${PHPUNIT_SQLITE_STATUS}** | phpunit_sqlite.log |
+| Integration Tests | MySQL Isolated Service (${MYSQL_VERSION}) | **${PHPUNIT_MYSQL_STATUS}** | phpunit_mysql.log |
+| Integration Tests | MariaDB Isolated Service (${MARIA_VERSION}) | **${PHPUNIT_MARIADB_STATUS}** | phpunit_mariadb.log |
+| Integration Tests | PostgreSQL Service (${PGSQL_VERSION}) | **${PHPUNIT_PGSQL_STATUS}** | phpunit_pgsql.log |
+| Application Integration | Laravel 11 (${L11_VERSION}) | **${APP_INTEGRATION_L11_STATUS}** | laravel11_integration.log |
+| Application Integration | Laravel 12 (${L12_VERSION}) | **${APP_INTEGRATION_L12_STATUS}** | laravel12_integration.log |
+| Application Integration | Laravel 13 (${L13_VERSION}) | **${APP_INTEGRATION_L13_STATUS}** | laravel13_integration.log |
 
 EOF
 
@@ -216,7 +243,7 @@ EOF
 Date: $(date -u +"%Y-%m-%d")
 Branch: \`${GIT_BRANCH}\`
 Commit: \`${GIT_COMMIT}\`
-Verified runtime: ${PHP_VERSION}, Laravel 11.57.0, 12.12.2 & 13.11.0, SQLite 3.x, MySQL 8.4, MariaDB 13.0, PostgreSQL 18.6
+Verified runtime: ${PHP_VERSION}, Laravel ${L11_VERSION}, ${L12_VERSION} & ${L13_VERSION}, SQLite ${SQLITE_VERSION}, MySQL ${MYSQL_VERSION}, MariaDB ${MARIA_VERSION}, PostgreSQL ${PGSQL_VERSION}
 
 ### Overall Stabilization
 
@@ -232,9 +259,9 @@ ${OVERALL_STATUS}
 | Code Formatting (Pint) | ${PINT_STATUS} |
 | Static Analysis (PHPStan) | ${PHPSTAN_STATUS} |
 | SQLite Integration | ${PHPUNIT_SQLITE_STATUS} |
-| MySQL 8.4 Integration | ${PHPUNIT_MYSQL_STATUS} |
-| MariaDB 13.0 Integration | ${PHPUNIT_MARIADB_STATUS} |
-| PostgreSQL 18.6 Integration | ${PHPUNIT_PGSQL_STATUS} |
+| MySQL Integration | ${PHPUNIT_MYSQL_STATUS} |
+| MariaDB Integration | ${PHPUNIT_MARIADB_STATUS} |
+| PostgreSQL Integration | ${PHPUNIT_PGSQL_STATUS} |
 | Laravel 11 Application Integration | ${APP_INTEGRATION_L11_STATUS} |
 | Laravel 12 Application Integration | ${APP_INTEGRATION_L12_STATUS} |
 | Laravel 13 Application Integration | ${APP_INTEGRATION_L13_STATUS} |
@@ -261,7 +288,7 @@ EOF
 - **Timestamp**: ${END_TIMESTAMP}
 - **Overall Result**: **${OVERALL_STATUS}**
 
-All automated verification gates, multi-engine tests (SQLite, MySQL 8.4, MariaDB 13.0, PostgreSQL 18.6), unsuppressed dependency security audits, and independent clean Laravel 11, Laravel 12, and Laravel 13 application scenarios have been executed and logged.
+All automated verification gates, multi-engine tests (SQLite ${SQLITE_VERSION}, MySQL ${MYSQL_VERSION}, MariaDB ${MARIA_VERSION}, PostgreSQL ${PGSQL_VERSION}), unsuppressed dependency security audits, and independent clean Laravel 11 (${L11_VERSION}), Laravel 12 (${L12_VERSION}), and Laravel 13 (${L13_VERSION}) application scenarios have been executed and logged.
 EOF
     fi
 }
@@ -311,6 +338,7 @@ echo " Database Target: ${SELECTED_DB}"
 echo " Laravel Target: ${SELECTED_LV}"
 echo " Start Time: ${START_TIMESTAMP}"
 echo " Root Directory: ${ROOT_DIR}"
+echo " Ports: MySQL=${DB_MYSQL_PORT}, MariaDB=${DB_MARIA_PORT}, PgSQL=${DB_PGSQL_PORT}"
 echo "======================================================================"
 
 # 1. Composer validate
@@ -350,7 +378,7 @@ TMP_COMPOSER_AUDIT=""
 # 3. Pint code style
 echo "[3/8] Running Pint Code Style Verification..."
 PINT_STATUS="RUNNING"
-if vendor/bin/pint --test > "${RUN_DIR}/pint.log" 2>&1; then
+if "${PINT_BIN}" --test > "${RUN_DIR}/pint.log" 2>&1; then
     PINT_STATUS="PASS"
     cat "${RUN_DIR}/pint.log"
 else
@@ -362,7 +390,7 @@ fi
 # 4. PHPStan static analysis
 echo "[4/8] Running PHPStan Static Analysis (Level 5)..."
 PHPSTAN_STATUS="RUNNING"
-if vendor/bin/phpstan analyse --no-progress > "${RUN_DIR}/phpstan.log" 2>&1; then
+if "${PHPSTAN_BIN}" analyse --no-progress > "${RUN_DIR}/phpstan.log" 2>&1; then
     PHPSTAN_STATUS="PASS"
     cat "${RUN_DIR}/phpstan.log"
 else
@@ -376,7 +404,7 @@ PHPUNIT_SQLITE_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "sqlite" ] || [ "${SELECTED_DB}" = "all" ]; then
     echo "[5/8] Running Local PHPUnit Test Suite on SQLite..."
     PHPUNIT_SQLITE_STATUS="RUNNING"
-    if vendor/bin/phpunit > "${RUN_DIR}/phpunit_sqlite.log" 2>&1; then
+    if "${PHPUNIT_BIN}" > "${RUN_DIR}/phpunit_sqlite.log" 2>&1; then
         PHPUNIT_SQLITE_STATUS="PASS"
         cat "${RUN_DIR}/phpunit_sqlite.log"
     else
@@ -389,30 +417,32 @@ fi
 # 6. Multi-Engine: MySQL 8.x, MariaDB & PostgreSQL
 PHPUNIT_MYSQL_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "mysql" ] || [ "${SELECTED_DB}" = "all" ]; then
-    echo "[6a/8] Running Isolated MySQL 8.x Integration Tests..."
-    if command -v mysqld >/dev/null 2>&1; then
+    echo "[6a/8] Running Isolated MySQL Integration Tests..."
+    if command -v "${MYSQLD_BIN}" >/dev/null 2>&1; then
         MYSQL_TMP=$(mktemp -d /tmp/mysql-verify-XXXXXX)
         mkdir -p "${MYSQL_TMP}/data"
         cat << 'MYCFG' > "${MYSQL_TMP}/my.cnf"
 [mysqld]
 datadir=DATADIR_PLACEHOLDER/data
-port=3308
+port=PORT_PLACEHOLDER
 socket=DATADIR_PLACEHOLDER/mysql.sock
 pid-file=DATADIR_PLACEHOLDER/mysql.pid
 bind-address=127.0.0.1
 mysqlx=OFF
 MYCFG
         sed -i "s|DATADIR_PLACEHOLDER|${MYSQL_TMP}|g" "${MYSQL_TMP}/my.cnf"
+        sed -i "s|PORT_PLACEHOLDER|${DB_MYSQL_PORT}|g" "${MYSQL_TMP}/my.cnf"
 
-        mysqld --defaults-file="${MYSQL_TMP}/my.cnf" --initialize-insecure >/dev/null 2>&1
-        mysqld --defaults-file="${MYSQL_TMP}/my.cnf" > "${MYSQL_TMP}/mysqld.log" 2>&1 &
+        "${MYSQLD_BIN}" --defaults-file="${MYSQL_TMP}/my.cnf" --initialize-insecure >/dev/null 2>&1
+        "${MYSQLD_BIN}" --defaults-file="${MYSQL_TMP}/my.cnf" > "${MYSQL_TMP}/mysqld.log" 2>&1 &
         MYSQL_PID=$!
         sleep 3
 
-        mysql -h 127.0.0.1 -P 3308 -u root -e "CREATE DATABASE IF NOT EXISTS lifecycle_test; CREATE DATABASE IF NOT EXISTS lifecycle_source_test;" >/dev/null 2>&1
+        MYSQL_VERSION=$(mysql -h 127.0.0.1 -P "${DB_MYSQL_PORT}" -u root -sN -e "SELECT @@version;" 2>/dev/null || echo "8.x")
+        mysql -h 127.0.0.1 -P "${DB_MYSQL_PORT}" -u root -e "CREATE DATABASE IF NOT EXISTS lifecycle_test; CREATE DATABASE IF NOT EXISTS lifecycle_source_test;" >/dev/null 2>&1
 
         PHPUNIT_MYSQL_STATUS="RUNNING"
-        if DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3308 DB_DATABASE=lifecycle_test DB_SOURCE_DATABASE=lifecycle_source_test DB_USERNAME=root DB_PASSWORD="" vendor/bin/phpunit > "${RUN_DIR}/phpunit_mysql.log" 2>&1; then
+        if DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT="${DB_MYSQL_PORT}" DB_DATABASE=lifecycle_test DB_SOURCE_DATABASE=lifecycle_source_test DB_USERNAME=root DB_PASSWORD="" "${PHPUNIT_BIN}" > "${RUN_DIR}/phpunit_mysql.log" 2>&1; then
             PHPUNIT_MYSQL_STATUS="PASS"
             cat "${RUN_DIR}/phpunit_mysql.log"
         else
@@ -427,7 +457,7 @@ MYCFG
         rm -rf "${MYSQL_TMP}" 2>/dev/null || true
         MYSQL_TMP=""
     else
-        echo "MySQL 8.x binaries not found; marking BLOCKED."
+        echo "MySQL binaries not found; marking BLOCKED."
         PHPUNIT_MYSQL_STATUS="BLOCKED"
         exit 1
     fi
@@ -439,14 +469,15 @@ if [ "${SELECTED_DB}" = "mariadb" ] || [ "${SELECTED_DB}" = "all" ]; then
     if command -v mariadb-install-db >/dev/null 2>&1 && command -v mariadbd >/dev/null 2>&1; then
         MARIA_TMP=$(mktemp -d /tmp/mariadb-verify-XXXXXX)
         mariadb-install-db --datadir="${MARIA_TMP}" --auth-root-authentication-method=normal >/dev/null 2>&1
-        mariadbd --datadir="${MARIA_TMP}" --port=3307 --socket="${MARIA_TMP}/mysql.sock" --pid-file="${MARIA_TMP}/mysql.pid" --skip-networking=0 --bind-address=127.0.0.1 >/dev/null 2>&1 &
+        mariadbd --datadir="${MARIA_TMP}" --port="${DB_MARIA_PORT}" --socket="${MARIA_TMP}/mysql.sock" --pid-file="${MARIA_TMP}/mysql.pid" --skip-networking=0 --bind-address=127.0.0.1 >/dev/null 2>&1 &
         MARIA_PID=$!
         sleep 2
 
-        mariadb -h 127.0.0.1 -P 3307 -u root -e "CREATE DATABASE IF NOT EXISTS lifecycle_test; CREATE DATABASE IF NOT EXISTS lifecycle_source_test;" >/dev/null 2>&1
+        MARIA_VERSION=$(mariadb -h 127.0.0.1 -P "${DB_MARIA_PORT}" -u root -sN -e "SELECT @@version;" 2>/dev/null || echo "MariaDB")
+        mariadb -h 127.0.0.1 -P "${DB_MARIA_PORT}" -u root -e "CREATE DATABASE IF NOT EXISTS lifecycle_test; CREATE DATABASE IF NOT EXISTS lifecycle_source_test;" >/dev/null 2>&1
 
         PHPUNIT_MARIADB_STATUS="RUNNING"
-        if DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3307 DB_DATABASE=lifecycle_test DB_SOURCE_DATABASE=lifecycle_source_test DB_USERNAME=root DB_PASSWORD="" vendor/bin/phpunit > "${RUN_DIR}/phpunit_mariadb.log" 2>&1; then
+        if DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT="${DB_MARIA_PORT}" DB_DATABASE=lifecycle_test DB_SOURCE_DATABASE=lifecycle_source_test DB_USERNAME=root DB_PASSWORD="" "${PHPUNIT_BIN}" > "${RUN_DIR}/phpunit_mariadb.log" 2>&1; then
             PHPUNIT_MARIADB_STATUS="PASS"
             cat "${RUN_DIR}/phpunit_mariadb.log"
         else
@@ -470,9 +501,10 @@ fi
 PHPUNIT_PGSQL_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "pgsql" ] || [ "${SELECTED_DB}" = "all" ]; then
     echo "[6c/8] Running PostgreSQL Multi-Engine Integration Tests..."
-    if psql -U "${DB_USERNAME:-ahtesham}" -h 127.0.0.1 -d lifecycle_test -c "SELECT 1;" >/dev/null 2>&1; then
+    if psql -U "${DB_USERNAME:-ahtesham}" -h 127.0.0.1 -p "${DB_PGSQL_PORT}" -d lifecycle_test -c "SELECT 1;" >/dev/null 2>&1; then
+        PGSQL_VERSION=$(psql -U "${DB_USERNAME:-ahtesham}" -h 127.0.0.1 -p "${DB_PGSQL_PORT}" -d lifecycle_test -t -c "SHOW server_version;" 2>/dev/null | xargs || echo "PostgreSQL")
         PHPUNIT_PGSQL_STATUS="RUNNING"
-        if DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT=5432 DB_DATABASE=lifecycle_test DB_SOURCE_DATABASE=lifecycle_source_test DB_USERNAME="${DB_USERNAME:-ahtesham}" DB_PASSWORD="" vendor/bin/phpunit > "${RUN_DIR}/phpunit_pgsql.log" 2>&1; then
+        if DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT="${DB_PGSQL_PORT}" DB_DATABASE=lifecycle_test DB_SOURCE_DATABASE=lifecycle_source_test DB_USERNAME="${DB_USERNAME:-ahtesham}" DB_PASSWORD="" "${PHPUNIT_BIN}" > "${RUN_DIR}/phpunit_pgsql.log" 2>&1; then
             PHPUNIT_PGSQL_STATUS="PASS"
             cat "${RUN_DIR}/phpunit_pgsql.log"
         else
@@ -481,7 +513,7 @@ if [ "${SELECTED_DB}" = "pgsql" ] || [ "${SELECTED_DB}" = "all" ]; then
             exit 1
         fi
     else
-        echo "PostgreSQL not reachable on 127.0.0.1:5432; marking BLOCKED."
+        echo "PostgreSQL not reachable on 127.0.0.1:${DB_PGSQL_PORT}; marking BLOCKED."
         PHPUNIT_PGSQL_STATUS="BLOCKED"
         exit 1
     fi
@@ -494,6 +526,7 @@ if [ "${SELECTED_LV}" = "11" ] || [ "${SELECTED_LV}" = "all" ]; then
     APP_INTEGRATION_L11_STATUS="RUNNING"
     if bash "${ROOT_DIR}/tests/integration-app/scripts/run-app-integration.sh" --laravel=11 > "${RUN_DIR}/laravel11_integration.log" 2>&1; then
         APP_INTEGRATION_L11_STATUS="PASS"
+        L11_VERSION=$(php -r '$l = json_decode(@file_get_contents(".workbench/laravel-11/composer.lock"), true); foreach(($l["packages"]??[]) as $p){ if($p["name"]==="laravel/framework"){ echo $p["version"]; exit; } } echo "11.x";' 2>/dev/null)
         cat "${RUN_DIR}/laravel11_integration.log"
     else
         APP_INTEGRATION_L11_STATUS="FAIL"
@@ -507,6 +540,7 @@ if [ "${SELECTED_LV}" = "12" ] || [ "${SELECTED_LV}" = "all" ]; then
     APP_INTEGRATION_L12_STATUS="RUNNING"
     if bash "${ROOT_DIR}/tests/integration-app/scripts/run-app-integration.sh" --laravel=12 > "${RUN_DIR}/laravel12_integration.log" 2>&1; then
         APP_INTEGRATION_L12_STATUS="PASS"
+        L12_VERSION=$(php -r '$l = json_decode(@file_get_contents(".workbench/laravel-12/composer.lock"), true); foreach(($l["packages"]??[]) as $p){ if($p["name"]==="laravel/framework"){ echo $p["version"]; exit; } } echo "12.x";' 2>/dev/null)
         cat "${RUN_DIR}/laravel12_integration.log"
     else
         APP_INTEGRATION_L12_STATUS="FAIL"
@@ -520,6 +554,7 @@ if [ "${SELECTED_LV}" = "13" ] || [ "${SELECTED_LV}" = "all" ]; then
     APP_INTEGRATION_L13_STATUS="RUNNING"
     if bash "${ROOT_DIR}/tests/integration-app/scripts/run-app-integration.sh" --laravel=13 > "${RUN_DIR}/laravel13_integration.log" 2>&1; then
         APP_INTEGRATION_L13_STATUS="PASS"
+        L13_VERSION=$(php -r '$l = json_decode(@file_get_contents(".workbench/laravel-13/composer.lock"), true); foreach(($l["packages"]??[]) as $p){ if($p["name"]==="laravel/framework"){ echo $p["version"]; exit; } } echo "13.x";' 2>/dev/null)
         cat "${RUN_DIR}/laravel13_integration.log"
     else
         APP_INTEGRATION_L13_STATUS="FAIL"
