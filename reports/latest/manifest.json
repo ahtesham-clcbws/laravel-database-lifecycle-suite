@@ -1,113 +1,134 @@
 {
-  "schema_version": "2.0.0",
-  "run_id": "run_20261022_061330_239634",
-  "start_time": "2026-10-22 06:13:30 UTC",
-  "end_time": "2026-10-22 06:17:58 UTC",
-  "overall_status": "PASS",
-  "certification": {
-    "model": "two_revision_verification",
-    "source_sha": "fecea8d4ff2f849b088c9cb6244bd5d1417039b0",
-    "evidence_sha": "7c2e81a74a4535238863391586e4cfd78f054f94",
-    "evidence_only_diff_gate": "PASS",
-    "ci_run_id": "39741386110",
-    "ci_run_url": "https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110",
-    "evidence_ci_run_id": "39741795127",
-    "evidence_ci_run_url": "https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741795127",
-    "ci_evidence_file": "reports/latest/ci_evidence.json"
-  },
-  "git": {
-    "commit": "fecea8d4ff2f849b088c9cb6244bd5d1417039b0",
-    "source_sha": "fecea8d4ff2f849b088c9cb6244bd5d1417039b0",
-    "evidence_sha": "7c2e81a74a4535238863391586e4cfd78f054f94",
-    "branch": "development",
-    "worktree_clean": 1,
-    "commit_count": 66
-  },
-  "runtime": {
-    "php": "PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)",
-    "composer": "Composer version 2.10.3 2026-08-27 13:34:23",
-    "sqlite": "3.54.0",
-    "mysql": "8.4.2",
-    "mariadb": "13.0.2-MariaDB",
-    "postgresql": "18.6",
-    "laravel_11": "v11.57.0",
-    "laravel_12": "v12.70.1",
-    "laravel_13": "v13.38.0"
-  },
-  "results": {
-    "composer_validate": "PASS",
-    "composer_audit": "PASS",
-    "pint": "PASS",
-    "phpstan": "PASS",
-    "phpunit_sqlite": "PASS",
-    "phpunit_mysql": "PASS",
-    "phpunit_mariadb": "PASS",
-    "phpunit_pgsql": "PASS",
-    "app_integration_laravel_11": "PASS",
-    "app_integration_laravel_12": "PASS",
-    "app_integration_laravel_13": "PASS"
-  },
-  "gates": {
-    "composer_validate": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/composer_validate.log"
+    "run_id": "run_20261022_075429_275280",
+    "start_time": "2026-10-22 07:54:29 UTC",
+    "end_time": "2026-10-22 07:58:53 UTC",
+    "overall_status": "PASS",
+    "git": {
+        "commit": "b4af13da7869434b91e7e6e5036c5b6ed60f127a",
+        "branch": "development",
+        "worktree_clean": 1,
+        "commit_count": 69,
+        "source_sha": "fecea8d4ff2f849b088c9cb6244bd5d1417039b0",
+        "certified_evidence_sha": "b4af13da7869434b91e7e6e5036c5b6ed60f127a",
+        "current_release_candidate_sha": "c01bf76a6869410afef544fc883d2aad70732e34"
     },
-    "composer_audit": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/composer_audit.log"
+    "runtime": {
+        "php": "PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)",
+        "composer": "Composer version 2.10.3 2026-08-27 13:34:23",
+        "sqlite": "3.54.0",
+        "mysql": "8.4.2",
+        "mariadb": "13.0.2-MariaDB",
+        "postgresql": "18.6",
+        "laravel_11": "v11.57.0",
+        "laravel_12": "v12.70.1",
+        "laravel_13": "v13.38.0"
     },
-    "pint": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/pint.log"
+    "results": {
+        "composer_validate": "PASS",
+        "composer_audit": "PASS",
+        "pint": "PASS",
+        "phpstan": "PASS",
+        "phpunit_sqlite": "PASS",
+        "phpunit_mysql": "PASS",
+        "phpunit_mariadb": "PASS",
+        "phpunit_pgsql": "PASS",
+        "app_integration_laravel_11": "PASS",
+        "app_integration_laravel_12": "PASS",
+        "app_integration_laravel_13": "PASS"
     },
-    "phpstan": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/phpstan.log"
+    "test_metrics": {
+        "sqlite": {
+            "tests": 149,
+            "assertions": 492,
+            "skipped": 0,
+            "failures": 0
+        },
+        "mysql": {
+            "tests": 149,
+            "assertions": 488,
+            "skipped": 2,
+            "failures": 0
+        },
+        "mariadb": {
+            "tests": 149,
+            "assertions": 488,
+            "skipped": 2,
+            "failures": 0
+        },
+        "postgresql": {
+            "tests": 149,
+            "assertions": 491,
+            "skipped": 1,
+            "failures": 0
+        }
     },
-    "phpunit_sqlite": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/phpunit_sqlite.log"
+    "certification": {
+        "model": "two_revision_verification",
+        "source_sha": "fecea8d4ff2f849b088c9cb6244bd5d1417039b0",
+        "certified_evidence_sha": "b4af13da7869434b91e7e6e5036c5b6ed60f127a",
+        "current_release_candidate_sha": "c01bf76a6869410afef544fc883d2aad70732e34",
+        "evidence_only_diff_gate": "PASS",
+        "ci_run_id": "39741386110",
+        "ci_run_url": "https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110",
+        "evidence_ci_run_id": "39742020026",
+        "evidence_ci_run_url": "https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026",
+        "ci_evidence_file": "reports/latest/ci_evidence.json"
     },
-    "phpunit_mysql": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/phpunit_mysql.log"
-    },
-    "phpunit_mariadb": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/phpunit_mariadb.log"
-    },
-    "phpunit_pgsql": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/phpunit_pgsql.log"
-    },
-    "app_integration_laravel_11": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/laravel11_integration.log"
-    },
-    "app_integration_laravel_12": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/laravel12_integration.log"
-    },
-    "app_integration_laravel_13": {
-      "status": "PASS",
-      "exit_code": 0,
-      "evidence_path": "reports/runs/run_20261022_061330_239634/laravel13_integration.log"
+    "gates": {
+        "composer_validate": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/composer_validate.log"
+        },
+        "composer_audit": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/composer_audit.log"
+        },
+        "pint": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/pint.log"
+        },
+        "phpstan": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/phpstan.log"
+        },
+        "phpunit_sqlite": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/phpunit_sqlite.log"
+        },
+        "phpunit_mysql": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/phpunit_mysql.log"
+        },
+        "phpunit_mariadb": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/phpunit_mariadb.log"
+        },
+        "phpunit_pgsql": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/phpunit_pgsql.log"
+        },
+        "app_integration_laravel_11": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/laravel11_integration.log"
+        },
+        "app_integration_laravel_12": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/laravel12_integration.log"
+        },
+        "app_integration_laravel_13": {
+            "status": "PASS",
+            "exit_code": 0,
+            "evidence_path": "reports/runs/run_20261022_075429_275280/laravel13_integration.log"
+        }
     }
-  },
-  "test_metrics": {
-    "sqlite": {"tests": 149, "assertions": 492, "skipped": 0, "failures": 0},
-    "mysql": {"tests": 149, "assertions": 488, "skipped": 2, "failures": 0},
-    "mariadb": {"tests": 149, "assertions": 488, "skipped": 2, "failures": 0},
-    "postgresql": {"tests": 149, "assertions": 491, "skipped": 1, "failures": 0}
-  }
 }

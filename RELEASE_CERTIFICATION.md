@@ -4,7 +4,9 @@
 **Master Branch**: `master` (Untouched, 0 modifications, no merges performed)  
 **Certification Model**: Two-Revision Verification Architecture  
 **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
-**Evaluated Run ID**: `run_20261022_061330_239634`  
+**Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `b4af13da7869434b91e7e6e5036c5b6ed60f127a`  
+**Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `c01bf76a6869410afef544fc883d2aad70732e34`  
+**Evaluated Run ID**: `run_20261022_075429_275280`  
 **Overall Status**: **100% PASS (CERTIFIED)**  
 **Local Test Suite**: 149 tests, 492 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
 
@@ -35,10 +37,10 @@
 
 | Engine | Version | PHP | Laravel | Tests | Assertions | Failed | Skipped | Status | Log / Run Context |
 |---|---|---|---|---|---|---|---|---|---|
-| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 149 | 492 | 0 | 0 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_sqlite.log` |
-| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mysql.log` |
-| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mariadb.log` |
-| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 149 | 491 | 0 | 1 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_pgsql.log` |
+| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 149 | 492 | 0 | 0 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_sqlite.log` |
+| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_mysql.log` |
+| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_mariadb.log` |
+| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 149 | 491 | 0 | 1 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_pgsql.log` |
 
 ---
 
@@ -55,10 +57,11 @@
 
 ---
 
-## D. CI Verification Evidence (Run #39741386110)
+## D. CI Verification Evidence Traceability
+
+### 1. Certified Source Commit Run (`SOURCE_SHA`: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`)
 
 Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110)  
-Certified Source Commit: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
 Status: **100% Success across all 12 jobs**
 
 | Job Name | Job ID | Status | URL |
@@ -78,10 +81,34 @@ Status: **100% Success across all 12 jobs**
 
 ---
 
+### 2. Certified Evidence Commit Run (`CERTIFIED_EVIDENCE_SHA`: `b4af13da7869434b91e7e6e5036c5b6ed60f127a`)
+
+Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026)  
+Status: **100% Success across all 12 jobs**
+
+| Job Name | Job ID | Status | URL |
+|---|---|---|---|
+| **Code Quality (Pint & PHPStan)** | 119701295498 | ✅ Success | [Job 119701295498](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295498) |
+| **MySQL Integration** | 119701295830 | ✅ Success | [Job 119701295830](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295830) |
+| **PostgreSQL Integration** | 119701295844 | ✅ Success | [Job 119701295844](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295844) |
+| **MariaDB Integration** | 119701295914 | ✅ Success | [Job 119701295914](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295914) |
+| **PHP 8.3 - L11.*** | 119701295931 | ✅ Success | [Job 119701295931](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295931) |
+| **PHP 8.3 - L13.*** | 119701296061 | ✅ Success | [Job 119701296061](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296061) |
+| **PHP 8.3 - L12.*** | 119701296085 | ✅ Success | [Job 119701296085](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296085) |
+| **PHP 8.4 - L13.*** | 119701296144 | ✅ Success | [Job 119701296144](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296144) |
+| **PHP 8.4 - L12.*** | 119701296172 | ✅ Success | [Job 119701296172](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296172) |
+| **PHP 8.2 - L11.*** | 119701296191 | ✅ Success | [Job 119701296191](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296191) |
+| **PHP 8.2 - L12.*** | 119701296211 | ✅ Success | [Job 119701296211](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296211) |
+| **PHP 8.4 - L11.*** | 119701296266 | ✅ Success | [Job 119701296266](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296266) |
+
+---
+
 ## E. Git & Boundary Compliance Summary
 
 - **Starting Branch**: `development`
 - **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`
+- **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `b4af13da7869434b91e7e6e5036c5b6ed60f127a`
+- **Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `c01bf76a6869410afef544fc883d2aad70732e34`
 - **Evidence-Only Diff Gate**: Automated verification via `scripts/validate-evidence-diff.sh`
 - **Working Tree**: Clean
 - **Boundary Check**:
