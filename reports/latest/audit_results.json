@@ -1,0 +1,164 @@
+{
+    "commands": {
+        "CastAuditCommand": {
+            "file": "src\/Commands\/CastAuditCommand.php",
+            "signature": "db:cast-audit \n                            {--path=app\/Models : Path to models} \n                            {--database= : The database connection to use}\n                            {--strict : Return a non-zero exit code if cast mismatches are detected}",
+            "description": "Detect inconsistencies between Eloquent Model $casts and actual database column types",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "ColumnTypeAuditCommand": {
+            "file": "src\/Commands\/ColumnTypeAuditCommand.php",
+            "signature": "db:column-type-audit \n                            {--database= : The database connection to use}\n                            {--strict : Return a non-zero exit code if inconsistent column types are detected}",
+            "description": "Detect inconsistent data types for columns with the same name across tables",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "ConnectionCheckCommand": {
+            "file": "src\/Commands\/ConnectionCheckCommand.php",
+            "signature": "db:connection-check {--connections= : Comma-separated list of connections to check}",
+            "description": "Verify all configured database connections are reachable and measure latency",
+            "supports_json": false,
+            "supports_strict": false
+        },
+        "DataDriftCommand": {
+            "file": "src\/Commands\/DataDriftCommand.php",
+            "signature": "db:data-drift \n                            {--source= : Source connection to compare against} \n                            {--database= : The live database connection to check}\n                            {--table= : Specific table to check}\n                            {--fix : Interactively fix detected drifts}\n                            {--limit=1000 : Maximum number of drift records to evaluate per table}\n                            {--strict : Return a non-zero exit code if any drift is detected}\n                            {--force : Force the operation to run when in production}",
+            "description": "Detect differences in reference data between local and source connections",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "ErdCommand": {
+            "file": "src\/Commands\/ErdCommand.php",
+            "signature": "db:erd {--database= : The database connection to use} {--output= : Path to save the Mermaid file}",
+            "description": "Generate a Mermaid.js Entity Relationship Diagram (ERD) of the database",
+            "supports_json": false,
+            "supports_strict": false
+        },
+        "IndexAuditCommand": {
+            "file": "src\/Commands\/IndexAuditCommand.php",
+            "signature": "db:index-audit \n                            {--database= : The database connection to use}\n                            {--strict : Return a non-zero exit code if missing foreign key indexes are found}",
+            "description": "Detect missing indexes on foreign key columns",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "LegacyBridgeCommand": {
+            "file": "src\/Commands\/LegacyBridgeCommand.php",
+            "signature": "db:legacy-bridge \n                            {--tables= : Comma-separated list of tables (defaults to all)} \n                            {--database= : The database connection to use}\n                            {--force : Overwrite existing generated artifact files}",
+            "description": "Reverse-engineer a database into migrations, models, seeders, and factories",
+            "supports_json": false,
+            "supports_strict": false
+        },
+        "LifecycleStatusCommand": {
+            "file": "src\/Commands\/LifecycleStatusCommand.php",
+            "signature": "db:lifecycle-status \n                            {--database= : The database connection to use}\n                            {--format=table : Output format (table or json)}\n                            {--strict : Return non-zero exit code if any check fails}",
+            "description": "Run a comprehensive database lifecycle health check and scorecard",
+            "supports_json": true,
+            "supports_strict": true
+        },
+        "PiiScanCommand": {
+            "file": "src\/Commands\/PiiScanCommand.php",
+            "signature": "db:pii-scan \n                            {--database= : The database connection to use}\n                            {--strict : Return a non-zero exit code if potential PII columns are found}",
+            "description": "Heuristically scan database columns for potential PII (Sensitive Data)",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "QueryExplainCommand": {
+            "file": "src\/Commands\/QueryExplainCommand.php",
+            "signature": "db:explain {query : The SQL SELECT query to analyze} {--database= : The database connection to use}",
+            "description": "Analyze a SQL SELECT query performance using EXPLAIN",
+            "supports_json": false,
+            "supports_strict": false
+        },
+        "RedundantIndexCommand": {
+            "file": "src\/Commands\/RedundantIndexCommand.php",
+            "signature": "db:index-redundancy \n                            {--database= : The database connection to use}\n                            {--strict : Return a non-zero exit code if redundant indexes are found}",
+            "description": "Detect redundant indexes that are covered by longer composite indexes",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "SnapshotCommand": {
+            "file": "src\/Commands\/SnapshotCommand.php",
+            "signature": "db:snapshot \n                            {name? : Optional name for the snapshot} \n                            {--database= : The database connection to use}\n                            {--force : Overwrite existing snapshot file without prompt}",
+            "description": "Capture the current database schema into a JSON snapshot",
+            "supports_json": true,
+            "supports_strict": false
+        },
+        "SnapshotDiffCommand": {
+            "file": "src\/Commands\/SnapshotDiffCommand.php",
+            "signature": "db:snapshot-diff \n                            {base : The baseline snapshot name} \n                            {target? : The snapshot to compare against (ignored if --live is used)}\n                            {--live : Compare baseline snapshot against the live database}\n                            {--database= : The database connection to use for live comparison}",
+            "description": "Compare two schema snapshots or compare a snapshot against the live database",
+            "supports_json": true,
+            "supports_strict": false
+        },
+        "SnapshotRestoreCommand": {
+            "file": "src\/Commands\/SnapshotRestoreCommand.php",
+            "signature": "db:snapshot-restore \n                            {name : The snapshot file name to restore} \n                            {--database= : The database connection to use} \n                            {--recreate : Drop and recreate existing tables if safe (DESTRUCTIVE)}\n                            {--dry-run : Preview planned actions without modifying the database}\n                            {--force : Force the operation to run when in production}",
+            "description": "Safely restore structural database schema from a snapshot",
+            "supports_json": false,
+            "supports_strict": false
+        },
+        "SoftDeleteAuditCommand": {
+            "file": "src\/Commands\/SoftDeleteAuditCommand.php",
+            "signature": "db:soft-delete-audit \n                            {--path=app\/Models : Path to models directory} \n                            {--database= : The database connection to use}\n                            {--strict : Return a non-zero exit code if soft delete mismatches are found}",
+            "description": "Verify consistency between Eloquent SoftDeletes and database columns",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "StandardizeIndexesCommand": {
+            "file": "src\/Commands\/StandardizeIndexesCommand.php",
+            "signature": "db:standardize-indexes \n                            {--database= : The database connection to use}\n                            {--dry-run : Only show what would be changed without applying}\n                            {--force : Force the operation to run when in production}",
+            "description": "Detect and fix database index names that do not follow standard naming conventions",
+            "supports_json": false,
+            "supports_strict": false
+        },
+        "TableConventionAuditCommand": {
+            "file": "src\/Commands\/TableConventionAuditCommand.php",
+            "signature": "db:convention-audit \n                            {--database= : The database connection to use}\n                            {--strict : Return a non-zero exit code if naming convention violations are found}",
+            "description": "Detect database tables that do not follow Laravel naming conventions (snake_case, plural)",
+            "supports_json": false,
+            "supports_strict": true
+        },
+        "TableSizeReportCommand": {
+            "file": "src\/Commands\/TableSizeReportCommand.php",
+            "signature": "db:size-report {--database= : The database connection to use}",
+            "description": "Report physical disk size and row count for all tables",
+            "supports_json": false,
+            "supports_strict": false
+        }
+    },
+    "auditors": [],
+    "safety": {
+        "src\/SchemaSnapshotManager.php": {
+            "has_production_check": false,
+            "has_fail_closed_exception": true,
+            "has_regex_validation": true,
+            "has_locking": false
+        },
+        "src\/DataDriftDetector.php": {
+            "has_production_check": false,
+            "has_fail_closed_exception": true,
+            "has_regex_validation": false,
+            "has_locking": true
+        },
+        "src\/QueryAnalyzer.php": {
+            "has_production_check": false,
+            "has_fail_closed_exception": true,
+            "has_regex_validation": true,
+            "has_locking": false
+        },
+        "src\/LegacyBridge.php": {
+            "has_production_check": true,
+            "has_fail_closed_exception": true,
+            "has_regex_validation": true,
+            "has_locking": false
+        },
+        "tests\/TestCase.php": {
+            "has_production_check": true,
+            "has_fail_closed_exception": true,
+            "has_regex_validation": true,
+            "has_locking": false
+        }
+    },
+    "findings": []
+}

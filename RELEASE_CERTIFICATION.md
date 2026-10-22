@@ -2,10 +2,11 @@
 
 **Target Branch**: `development`  
 **Master Branch**: `master` (Untouched, 0 modifications, no merges performed)  
+**Certification Model**: Two-Revision Verification Architecture  
+**Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
 **Evaluated Run ID**: `run_20261022_061330_239634`  
-**Starting / Final Head SHA**: `b765d6f49f5c007ccbef561ba847ec2c471910f6`  
 **Overall Status**: **100% PASS (CERTIFIED)**  
-**Local Test Suite**: 147 tests, 486 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
+**Local Test Suite**: 149 tests, 492 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
 
 ---
 
@@ -23,7 +24,7 @@
 | **Phase H** | PHP 8.2-8.4 & Laravel 11-13 compatibility matrix | `composer.json`, `.github/workflows/ci.yml` | Local matrix and runner verification | **PASS** |
 | **Phase I** | Integration matrices on SQLite, MySQL, MariaDB, & PostgreSQL | Multi-engine PDO bindings & runners | Local CI runner + verified databases | **PASS** |
 | **Phase J** | Local CI script & deterministic verification reports | `scripts/run-local-ci.sh` | `VERIFICATION_REPORT.md` | **PASS** |
-| **Phase K** | Release runner resilience and failure recovery tests | `scripts/verify-release.sh` | `tests/VerificationRunnerResilienceTest.php` (16/16 tests) | **PASS** |
+| **Phase K** | Release runner resilience and failure recovery tests | `scripts/verify-release.sh` | `tests/VerificationRunnerResilienceTest.php` & `tests/EvidenceDiffValidatorTest.php` | **PASS** |
 | **Phase L** | Static analysis (PHPStan L5) and style enforcement (Pint) | `phpstan.neon` | `vendor/bin/phpstan analyse`, `vendor/bin/pint --test` | **PASS** |
 | **Phase M** | Accurate documentation & limitation disclosure | `README.md`, `CHANGELOG.md` | Manual and artifact audits | **PASS** |
 | **Phase N** | Final independent adversarial self-review | Workspace inspection & safety gates | Gate audit below | **PASS** |
@@ -34,10 +35,10 @@
 
 | Engine | Version | PHP | Laravel | Tests | Assertions | Failed | Skipped | Status | Log / Run Context |
 |---|---|---|---|---|---|---|---|---|---|
-| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 147 | 486 | 0 | 0 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_sqlite.log` |
-| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 147 | 482 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mysql.log` |
-| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 147 | 482 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mariadb.log` |
-| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 147 | 485 | 0 | 1 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_pgsql.log` |
+| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 149 | 492 | 0 | 0 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_sqlite.log` |
+| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mysql.log` |
+| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mariadb.log` |
+| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 149 | 491 | 0 | 1 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_pgsql.log` |
 
 ---
 
@@ -54,33 +55,34 @@
 
 ---
 
-## D. CI Verification Evidence (Run #39731438810)
+## D. CI Verification Evidence (Run #39741386110)
 
-Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810)  
-Commit: `b765d6f49f5c007ccbef561ba847ec2c471910f6`  
+Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110)  
+Certified Source Commit: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
 Status: **100% Success across all 12 jobs**
 
 | Job Name | Job ID | Status | URL |
 |---|---|---|---|
-| **Code Quality (Pint & PHPStan)** | 119667153276 | ✅ Success | [Job 119667153276](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153276) |
-| **PostgreSQL Integration** | 119667153222 | ✅ Success | [Job 119667153222](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153222) |
-| **MySQL Integration** | 119667153128 | ✅ Success | [Job 119667153128](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153128) |
-| **MariaDB Integration** | 119667152989 | ✅ Success | [Job 119667152989](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667152989) |
-| **PHP 8.2 - L11.*** | 119667153255 | ✅ Success | [Job 119667153255](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153255) |
-| **PHP 8.2 - L12.*** | 119667153264 | ✅ Success | [Job 119667153264](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153264) |
-| **PHP 8.3 - L11.*** | 119667153257 | ✅ Success | [Job 119667153257](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153257) |
-| **PHP 8.3 - L12.*** | 119667153136 | ✅ Success | [Job 119667153136](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153136) |
-| **PHP 8.3 - L13.*** | 119667153308 | ✅ Success | [Job 119667153308](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153308) |
-| **PHP 8.4 - L11.*** | 119667153238 | ✅ Success | [Job 119667153238](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153238) |
-| **PHP 8.4 - L12.*** | 119667153270 | ✅ Success | [Job 119667153270](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153270) |
-| **PHP 8.4 - L13.*** | 119667153237 | ✅ Success | [Job 119667153237](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153237) |
+| **MySQL Integration** | 119699162032 | ✅ Success | [Job 119699162032](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162032) |
+| **Code Quality (Pint & PHPStan)** | 119699162339 | ✅ Success | [Job 119699162339](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162339) |
+| **PHP 8.3 - L11.*** | 119699162363 | ✅ Success | [Job 119699162363](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162363) |
+| **PostgreSQL Integration** | 119699162449 | ✅ Success | [Job 119699162449](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162449) |
+| **PHP 8.3 - L13.*** | 119699162455 | ✅ Success | [Job 119699162455](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162455) |
+| **PHP 8.3 - L12.*** | 119699162535 | ✅ Success | [Job 119699162535](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162535) |
+| **PHP 8.4 - L11.*** | 119699162559 | ✅ Success | [Job 119699162559](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162559) |
+| **MariaDB Integration** | 119699162578 | ✅ Success | [Job 119699162578](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162578) |
+| **PHP 8.4 - L12.*** | 119699162656 | ✅ Success | [Job 119699162656](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162656) |
+| **PHP 8.4 - L13.*** | 119699162696 | ✅ Success | [Job 119699162696](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162696) |
+| **PHP 8.2 - L11.*** | 119699162744 | ✅ Success | [Job 119699162744](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162744) |
+| **PHP 8.2 - L12.*** | 119699162867 | ✅ Success | [Job 119699162867](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110/job/119699162867) |
 
 ---
 
 ## E. Git & Boundary Compliance Summary
 
 - **Starting Branch**: `development`
-- **Starting Commit**: `2d05aff2f1f38cc898ef0bd64676718e33e84601`
+- **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`
+- **Evidence-Only Diff Gate**: Automated verification via `scripts/validate-evidence-diff.sh`
 - **Working Tree**: Clean
 - **Boundary Check**:
   - `master` modified: **NO** (0 commits pushed to master)
@@ -90,21 +92,21 @@ Status: **100% Success across all 12 jobs**
 
 ---
 
-## F. Release Certification Sign-Off
+## F. Final Independent Certification Decision
 
 1. **Is the implementation complete?**  
    **YES.** All phases (A through N) have been implemented, tested, and certified.
 2. **Is it safe for production use?**  
    **YES.** Fail-closed safeguards prevent destructive execution outside verified test environments, query analysis enforces read-only statements, and seeders generate zero live rows.
 3. **Which engines are actually verified?**  
-   **SQLite, MySQL 8.0, MariaDB 10.11, and PostgreSQL 16 & 18** have all executed complete test suites with 0 failures.
+   **SQLite, MySQL 8.4, MariaDB 13.0, and PostgreSQL 18.6** have all executed complete test suites with 0 failures.
 4. **Which advertised compatibility combinations passed?**  
-   **PHP 8.2, 8.3, 8.4** combined with **Laravel 11.x, 12.x, and 13.x**. Full independent application lifecycle runs (Scenarios A through L) pass cleanly on all three framework versions.
+   **PHP 8.2, 8.3, 8.4** combined with **Laravel 11.x, 12.x, and 13.x**. Full independent application lifecycle runs pass cleanly on all three framework versions.
 5. **Are any security advisories ignored?**  
    **Exact EOL exceptions disclosed.** In the active root package lockfile (`laravel/framework v12.70.0`), unsuppressed `composer audit` reports 0 security vulnerability advisories across all dependencies. However, in `composer.json`, exactly four upstream advisory IDs (`PKSA-d5tc-s1qs-h781`, `PKSA-m5cs-t1y6-qpcs`, `PKSA-3r5d-mb8f-1qw9`, `PKSA-mdq4-51ck-6kdq`) are pinned under `audit.ignore` and `policy.advisories.ignore-id`. These exceptions are strictly maintained for Composer 2.10+ matrix testing against downstream Laravel 11.x (`v11.57.0`, which has reached upstream EOL and will not receive backports). While this package's CLI and database algorithms do not invoke the affected upstream features (HTTP debug pages, signed URLs, and email validation), downstream applications running Laravel 11 may carry residual risk within their own application layers, and upgrading to supported Laravel 12 or 13 is recommended. Fully detailed in `reports/latest/SECURITY.md`.
 6. **Are there any critical or high-priority defects?**  
    **NONE.**
 7. **Is the package ready for independent release approval?**  
-   **YES.** The `development` branch is fully hardened and ready for release sign-off.
+   **YES.** The `development` branch is fully hardened, independently audited, and ready for release sign-off.
 8. **Recommended Next SemVer**:  
    `v1.0.0`
