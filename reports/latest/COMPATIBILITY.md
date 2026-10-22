@@ -26,24 +26,26 @@ Integration tests execute full migrations, schema captures, round-trip restorati
 | **MariaDB** | 13.0.2-MariaDB (Isolated Disposable Service) | TCP PDO (Port 3307) | 149 | 488 (2 driver-specific skips) | **PASS (0 failures)** |
 | **PostgreSQL** | 18.6 (Local Service) | TCP / Socket PDO (Port 5432) | 149 | 491 (1 driver-specific skip) | **PASS (0 failures)** |
 
-*\*Note on driver-specific skipped tests*:
-- In PostgreSQL: `test_it_permits_backtick_quoted_identifiers` is skipped because backtick quoting (`` `column` ``) is MySQL/MariaDB syntax, whereas PostgreSQL adheres to ANSI standard double quotes (`"`).
-- In MySQL / MariaDB: Index health auditor skips redundant index creation tests because MySQL/MariaDB automatically indexes foreign key columns natively upon constraint creation (`IndexHealthAuditorTest`). Quoting tests for double-quoted identifiers requiring ANSI_QUOTES mode are also skipped where appropriate.
+*\*Documentation of Intentional Driver-Specific Skipped Tests*:
+- **PostgreSQL (`1 skip`)**: `test_it_permits_backtick_quoted_identifiers` is skipped because backtick quoting (`` `column` ``) is MySQL/MariaDB syntax, whereas PostgreSQL adheres to ANSI standard double quotes (`"`).
+- **MySQL / MariaDB (`2 skips`)**: 
+  1. `test_it_detects_unindexed_foreign_keys` is skipped because MySQL and MariaDB InnoDB automatically and natively create backing index structures for foreign key columns upon constraint creation. Testing an unindexed foreign key is prevented by the database engine.
+  2. `test_it_permits_double_quoted_identifiers` is skipped because MySQL/MariaDB treats double quotes as string literal delimiters unless `ANSI_QUOTES` mode is explicitly enabled. Standard SQL in MySQL uses backticks.
 
 ---
 
-## 3. GitHub Actions CI Matrix Proof (Run #39741386110)
+## 3. GitHub Actions CI Matrix Proof (Run #39741386110 & #39745618000)
 
-All 12 jobs in the official GitHub Actions workflow passed against tested source revision `fecea8d`:
-1. `MySQL Integration` (Job ID: 119699162032): ✅ Success
-2. `Code Quality (Pint & PHPStan)` (Job ID: 119699162339): ✅ Success
-3. `PHP 8.3 - L11.*` (Job ID: 119699162363): ✅ Success
-4. `PostgreSQL Integration` (Job ID: 119699162449): ✅ Success
-5. `PHP 8.3 - L13.*` (Job ID: 119699162455): ✅ Success
-6. `PHP 8.3 - L12.*` (Job ID: 119699162535): ✅ Success
-7. `PHP 8.4 - L11.*` (Job ID: 119699162559): ✅ Success
-8. `MariaDB Integration` (Job ID: 119699162578): ✅ Success
-9. `PHP 8.4 - L12.*` (Job ID: 119699162656): ✅ Success
-10. `PHP 8.4 - L13.*` (Job ID: 119699162696): ✅ Success
-11. `PHP 8.2 - L11.*` (Job ID: 119699162744): ✅ Success
-12. `PHP 8.2 - L12.*` (Job ID: 119699162867): ✅ Success
+All 12 jobs in the official GitHub Actions workflow passed against tested source revision `fecea8d` (Run #39741386110) and certified evidence revision `e13a2e4` (Run #39745618000):
+1. `MySQL Integration`
+2. `Code Quality (Pint & PHPStan)`
+3. `PHP 8.3 - L11.*`
+4. `PostgreSQL Integration`
+5. `PHP 8.3 - L13.*`
+6. `PHP 8.3 - L12.*`
+7. `PHP 8.4 - L11.*`
+8. `MariaDB Integration`
+9. `PHP 8.4 - L12.*`
+10. `PHP 8.4 - L13.*`
+11. `PHP 8.2 - L11.*`
+12. `PHP 8.2 - L12.*`

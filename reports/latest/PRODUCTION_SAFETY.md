@@ -21,7 +21,7 @@ This document records the adversarial safety protections, environmental gates, a
 
 ## 2. Adversarial Test Evidence Summary
 
-All 147 suite tests and 486 assertions pass with 0 failures and 0 errors:
+All 149 suite tests and 492 assertions pass with 0 failures and 0 errors:
 
 1. **Spoofed Environment Bypass Attempt**:
    - `TestCase::dropAllTables()` attempted with `APP_ENV='production'` or unverified connection configuration -> Exception thrown immediately, zero tables dropped.
@@ -33,3 +33,12 @@ All 147 suite tests and 486 assertions pass with 0 failures and 0 errors:
    - `WITH deleted AS (DELETE FROM users RETURNING *) SELECT * FROM deleted;` -> Rejected fail-closed by `QueryAnalyzer`.
 5. **Locking Query Injection**:
    - `SELECT * FROM users FOR UPDATE;` -> Rejected fail-closed by `QueryAnalyzer`.
+
+---
+
+## 3. Defense-in-Depth & Realistic Boundary Disclosures
+
+While fail-closed gates and validation rules mitigate destructive accidents and adversarial input within supported paths:
+- **Database Engine DDL Constraints**: In MySQL and MariaDB, DDL operations trigger an implicit commit. Mid-process failure recovery during schema alterations must be inspected manually as transactional rollbacks cannot restore pre-DDL states in InnoDB.
+- **Production Privilege Principle**: Fail-closed checks provide software-level guardrails, but database user accounts deployed in production should always adhere to the principle of least privilege (e.g. withholding `DROP` or `SUPER` permissions where possible).
+- **Environment Separation**: Critical operations must run in dedicated staging environments before application to production databases.

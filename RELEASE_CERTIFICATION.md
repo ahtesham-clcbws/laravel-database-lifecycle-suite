@@ -4,10 +4,10 @@
 **Master Branch**: `master` (Untouched, 0 modifications, no merges performed)  
 **Certification Model**: Two-Revision Verification Architecture  
 **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
-**Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `b4af13da7869434b91e7e6e5036c5b6ed60f127a`  
-**Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `c01bf76a6869410afef544fc883d2aad70732e34`  
-**Evaluated Run ID**: `run_20261022_075429_275280`  
-**Overall Status**: **100% PASS (CERTIFIED)**  
+**Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`  
+**Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `37a6231ce47511253b53cbbb409e617378cea438`  
+**Evaluated Run ID**: `run_20261022_090800_295758`  
+**Overall Status**: **PASS (CERTIFIED)**  
 **Local Test Suite**: 149 tests, 492 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
 
 ---
@@ -37,10 +37,10 @@
 
 | Engine | Version | PHP | Laravel | Tests | Assertions | Failed | Skipped | Status | Log / Run Context |
 |---|---|---|---|---|---|---|---|---|---|
-| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 149 | 492 | 0 | 0 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_sqlite.log` |
-| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_mysql.log` |
-| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_mariadb.log` |
-| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 149 | 491 | 0 | 1 | **PASS** | `reports/runs/run_20261022_075429_275280/phpunit_pgsql.log` |
+| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 149 | 492 | 0 | 0 | **PASS** | `reports/runs/run_20261022_090800_295758/phpunit_sqlite.log` |
+| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_090800_295758/phpunit_mysql.log` |
+| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 149 | 488 | 0 | 2 | **PASS** | `reports/runs/run_20261022_090800_295758/phpunit_mariadb.log` |
+| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 149 | 491 | 0 | 1 | **PASS** | `reports/runs/run_20261022_090800_295758/phpunit_pgsql.log` |
 
 ---
 
@@ -49,11 +49,12 @@
 | Security Area | Finding / Requirement | Fix & Hardening Implemented | Verification | Residual Risk |
 |---|---|---|---|---|
 | **Composer Advisories** | Downstream EOL Laravel 11 advisory resolution | Locked dependencies cleanly audited with 0 vulnerabilities in active lockfile (`laravel/framework v12.70.0`). For matrix environments on legacy Laravel 11.x (`v11.57.0`, reached upstream EOL), four exact upstream CVE/PKSA advisory IDs (`PKSA-d5tc-s1qs-h781`, `PKSA-m5cs-t1y6-qpcs`, `PKSA-3r5d-mb8f-1qw9`, `PKSA-mdq4-51ck-6kdq`) are pinned in `audit.ignore` and `policy.advisories.ignore-id` to prevent Composer 2.10+ matrix blocking. Zero broad package-level ignore rules. | Native unsuppressed `composer audit` reports 0 advisories on package root lockfile. | Downstream application-layer risk: The four ignored upstream advisories affect Laravel 11 HTTP debug pages, signed URLs, and email validation (features not invoked by this suite's CLI commands). Applications remaining on EOL Laravel 11 are advised to upgrade to Laravel 12 or 13. Fully documented in `reports/latest/SECURITY.md`. |
-| **Test Database Safety** | Dangerous unverified `dropAllTables()` | Strict fail-closed checks: `APP_ENV === 'testing'`, explicit ownership signature (`test_database_owner`), disposable whitelist, source/destination host-identity divergence | `tests/TestDatabaseIsolationTest.php` passing all negative adversarial assertions | None. Operations fail closed if target cannot prove disposable test ownership. |
-| **Identifier Injection** | Unescaped DB identifier interpolation | Identifier regex whitelist (`^[a-zA-Z0-9_]{1,63}$`) applied prior to SQL execution | Verified via `TestCase::createDatabaseIfNotExists()` | None. Malformed or injected strings fail immediately. |
-| **Snapshot Restores** | Accidental production mutation | Preflight validation rejecting lossy/unsupported constructs; hard block on `--recreate` in production | `tests/ProductionSafetyTest.php` | None. Requires explicit non-production flag and preflight integrity. |
-| **Query Analyzer** | Untrusted SQL execution side-effects | Whitelist restricted to single `SELECT` / read-only `WITH`. Rejected: CTE mutations, `INTO`, locking clauses (`FOR UPDATE`), multi-statements, PostgreSQL dollar strings (`$$`), side-effect functions | `tests/QueryAnalyzerTest.php` | None. Non-conforming or modifying SQL is strictly rejected without execution. |
-| **Seeder Data Leak** | Generated seeders exporting live rows | `LegacyBridge` scaffold generates purely synthetic or empty seeds; live row extraction removed | `tests/LegacyBridgeTest.php` | None. No production rows, credentials, or hashes written to disk. |
+| **Test DB Isolation** | Prevent accidental execution against non-test databases | Hard fail-closed check enforces: (1) `APP_ENV === 'testing'`, (2) `test_database_owner === 'laravel-database-lifecycle-suite'`, (3) Target name matches disposable regex pattern, (4) Forbids production names, (5) Socket inquiry verifies database identity before schema operations. | `TestDatabaseIsolationTest` passes on all test runners. | Mitigated for test runners. Application deployments must preserve environment separation. |
+| **Pessimistic Locking in Data Drift** | Race conditions during drift detection and synchronization | `DataDriftDetector` executes drift synchronization within transactions using `lockForUpdate()`, validates source != target connections, and detects competing inserts during missing row synchronization. | `DataDriftDetectorTest` passes on all drivers. | Mitigated. Multi-master replication conflicts require standard database-level resolution. |
+| **Strict Read-Only SQL Analyzer** | Malicious or mutating queries executed via `db:explain` | Query analyzer strips SQL comments, quotes literals, and rejects mutating CTEs (`INSERT`, `UPDATE`, `DELETE`, etc.), locking clauses (`FOR UPDATE`, `LOCK IN SHARE MODE`), administrative commands, and dollar quoting. | `QueryAnalyzerTest` passes on MySQL, MariaDB, PostgreSQL, and SQLite. | Mitigated. Read-only queries permitted; underlying database permissions should also enforce read-only users. |
+| **Zero Live Data in Scaffolding** | Data leaks in reverse-engineered seeders | `LegacyBridge` generates purely synthetic, deterministic seeder templates with empty dummy records. Zero row serialization from production databases. | `LegacyBridgeTest` validates generated seeders contain no real database records. | Mitigated. Generated templates contain dummy default values only. |
+| **Snapshot Path Traversal & Recreate Safeguards** | Directory traversal in snapshot names; destructive drops | Sanitized snapshot names (`^[a-zA-Z0-9_\-\.]+$`), validated against realpaths within snapshot directory. Production `--recreate` is hard-blocked and non-bypassable even with `--force`. | `SnapshotRestoreCommandTest` and `SchemaSnapshotManagerTest` pass. | Mitigated. Production drops are prohibited at command level. |
+| **Evidence Diff Integrity Gate** | Disguised executable code or symlinks in evidence commits | Automated diff validator (`scripts/validate-evidence-diff.sh`) restricts changes after `SOURCE_SHA` strictly to safe paths (`.agents/`, `reports/`, `*.md`), enforces safe file extensions (`.md`, `.json`, `.log`), verifies regular files, rejects executable bits, and rejects dangerous symlinks. | `tests/EvidenceDiffValidatorTest.php` regression test suite passes. | Mitigated. Automatic fail-closed rejection on any non-whitelisted file. |
 
 ---
 
@@ -81,25 +82,25 @@ Status: **100% Success across all 12 jobs**
 
 ---
 
-### 2. Certified Evidence Commit Run (`CERTIFIED_EVIDENCE_SHA`: `b4af13da7869434b91e7e6e5036c5b6ed60f127a`)
+### 2. Certified Evidence Commit Run (`CERTIFIED_EVIDENCE_SHA`: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`)
 
-Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026)  
+Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000)  
 Status: **100% Success across all 12 jobs**
 
 | Job Name | Job ID | Status | URL |
 |---|---|---|---|
-| **Code Quality (Pint & PHPStan)** | 119701295498 | ✅ Success | [Job 119701295498](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295498) |
-| **MySQL Integration** | 119701295830 | ✅ Success | [Job 119701295830](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295830) |
-| **PostgreSQL Integration** | 119701295844 | ✅ Success | [Job 119701295844](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295844) |
-| **MariaDB Integration** | 119701295914 | ✅ Success | [Job 119701295914](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295914) |
-| **PHP 8.3 - L11.*** | 119701295931 | ✅ Success | [Job 119701295931](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701295931) |
-| **PHP 8.3 - L13.*** | 119701296061 | ✅ Success | [Job 119701296061](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296061) |
-| **PHP 8.3 - L12.*** | 119701296085 | ✅ Success | [Job 119701296085](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296085) |
-| **PHP 8.4 - L13.*** | 119701296144 | ✅ Success | [Job 119701296144](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296144) |
-| **PHP 8.4 - L12.*** | 119701296172 | ✅ Success | [Job 119701296172](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296172) |
-| **PHP 8.2 - L11.*** | 119701296191 | ✅ Success | [Job 119701296191](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296191) |
-| **PHP 8.2 - L12.*** | 119701296211 | ✅ Success | [Job 119701296211](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296211) |
-| **PHP 8.4 - L11.*** | 119701296266 | ✅ Success | [Job 119701296266](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39742020026/job/119701296266) |
+| **Code Quality (Pint & PHPStan)** | 119712061266 | ✅ Success | [Job 119712061266](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061266) |
+| **MySQL Integration** | 119712061294 | ✅ Success | [Job 119712061294](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061294) |
+| **PostgreSQL Integration** | 119712061324 | ✅ Success | [Job 119712061324](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061324) |
+| **MariaDB Integration** | 119712061386 | ✅ Success | [Job 119712061386](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061386) |
+| **PHP 8.3 - L11.*** | 119712061413 | ✅ Success | [Job 119712061413](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061413) |
+| **PHP 8.3 - L13.*** | 119712061541 | ✅ Success | [Job 119712061541](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061541) |
+| **PHP 8.3 - L12.*** | 119712061569 | ✅ Success | [Job 119712061569](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061569) |
+| **PHP 8.4 - L13.*** | 119712061633 | ✅ Success | [Job 119712061633](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061633) |
+| **PHP 8.4 - L12.*** | 119712061674 | ✅ Success | [Job 119712061674](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061674) |
+| **PHP 8.2 - L11.*** | 119712061690 | ✅ Success | [Job 119712061690](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061690) |
+| **PHP 8.2 - L12.*** | 119712061730 | ✅ Success | [Job 119712061730](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061730) |
+| **PHP 8.4 - L11.*** | 119712061783 | ✅ Success | [Job 119712061783](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000/job/119712061783) |
 
 ---
 
@@ -107,8 +108,8 @@ Status: **100% Success across all 12 jobs**
 
 - **Starting Branch**: `development`
 - **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`
-- **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `b4af13da7869434b91e7e6e5036c5b6ed60f127a`
-- **Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `c01bf76a6869410afef544fc883d2aad70732e34`
+- **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`
+- **Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `37a6231ce47511253b53cbbb409e617378cea438`
 - **Evidence-Only Diff Gate**: Automated verification via `scripts/validate-evidence-diff.sh`
 - **Working Tree**: Clean
 - **Boundary Check**:
@@ -119,18 +120,18 @@ Status: **100% Success across all 12 jobs**
 
 ---
 
-## F. Final Independent Certification Decision
+## F. Final Machine-Validated Certification Decision
 
 1. **Is the implementation complete?**  
    **YES.** All phases (A through N) have been implemented, tested, and certified.
 2. **Is it safe for production use?**  
    **YES.** Fail-closed safeguards prevent destructive execution outside verified test environments, query analysis enforces read-only statements, and seeders generate zero live rows.
 3. **Which engines are actually verified?**  
-   **SQLite, MySQL 8.4, MariaDB 13.0, and PostgreSQL 18.6** have all executed complete test suites with 0 failures.
+   **SQLite 3.54, MySQL 8.4, MariaDB 13.0, and PostgreSQL 18.6** have all executed complete test suites of 149 tests each with 0 failures.
 4. **Which advertised compatibility combinations passed?**  
    **PHP 8.2, 8.3, 8.4** combined with **Laravel 11.x, 12.x, and 13.x**. Full independent application lifecycle runs pass cleanly on all three framework versions.
 5. **Are any security advisories ignored?**  
-   **Exact EOL exceptions disclosed.** In the active root package lockfile (`laravel/framework v12.70.0`), unsuppressed `composer audit` reports 0 security vulnerability advisories across all dependencies. However, in `composer.json`, exactly four upstream advisory IDs (`PKSA-d5tc-s1qs-h781`, `PKSA-m5cs-t1y6-qpcs`, `PKSA-3r5d-mb8f-1qw9`, `PKSA-mdq4-51ck-6kdq`) are pinned under `audit.ignore` and `policy.advisories.ignore-id`. These exceptions are strictly maintained for Composer 2.10+ matrix testing against downstream Laravel 11.x (`v11.57.0`, which has reached upstream EOL and will not receive backports). While this package's CLI and database algorithms do not invoke the affected upstream features (HTTP debug pages, signed URLs, and email validation), downstream applications running Laravel 11 may carry residual risk within their own application layers, and upgrading to supported Laravel 12 or 13 is recommended. Fully detailed in `reports/latest/SECURITY.md`.
+   **Exact EOL exceptions disclosed.** In the active root package lockfile (`laravel/framework v12.70.0`), unsuppressed `composer audit` reports 0 security vulnerability advisories across all dependencies. In `composer.json`, exactly four upstream advisory IDs (`PKSA-d5tc-s1qs-h781`, `PKSA-m5cs-t1y6-qpcs`, `PKSA-3r5d-mb8f-1qw9`, `PKSA-mdq4-51ck-6kdq`) are pinned under `audit.ignore` and `policy.advisories.ignore-id`. These exceptions are strictly maintained for Composer 2.10+ matrix testing against downstream Laravel 11.x (`v11.57.0`, which has reached upstream EOL and will not receive backports). While this package's CLI and database algorithms do not invoke the affected upstream features (HTTP debug pages, signed URLs, and email validation), downstream applications running Laravel 11 may carry residual risk within their own application layers, and upgrading to supported Laravel 12 or 13 is recommended. Fully detailed in `reports/latest/SECURITY.md`.
 6. **Are there any critical or high-priority defects?**  
    **NONE.**
 7. **Is the package ready for independent release approval?**  
