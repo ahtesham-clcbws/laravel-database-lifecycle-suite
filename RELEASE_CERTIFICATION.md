@@ -2,10 +2,10 @@
 
 **Target Branch**: `development`  
 **Master Branch**: `master` (Untouched, 0 modifications, no merges performed)  
-**Evaluated Run ID**: `run_20261022_041926_182199`  
-**Starting / Final Head SHA**: `b555cccc6302a480bf44c42556e635e499949664`  
+**Evaluated Run ID**: `run_20261022_044929_199819`  
+**Starting / Final Head SHA**: `86b8e97165b7697d72fb77f5933e16dc66bc5ddf`  
 **Overall Status**: **100% PASS (CERTIFIED)**  
-**Local Test Suite**: 145 tests, 472 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
+**Local Test Suite**: 145 tests, 478 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
 
 ---
 
@@ -34,10 +34,10 @@
 
 | Engine | Version | PHP | Laravel | Tests | Assertions | Failed | Skipped | Status | Log / Run Context |
 |---|---|---|---|---|---|---|---|---|---|
-| **SQLite** | 3.x (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 145 | 472 | 0 | 0 | **PASS** | `reports/runs/run_20261022_041926_182199/phpunit_sqlite.log` |
-| **MySQL** | 8.4 (Isolated Container) | 8.5.11 | 13.x / 12.x | 145 | 468 | 0 | 2 | **PASS** | `reports/runs/run_20261022_041926_182199/phpunit_mysql.log` |
-| **MariaDB** | 13.0 (Isolated Service) | 8.5.11 | 13.x / 12.x | 145 | 468 | 0 | 2 | **PASS** | `reports/runs/run_20261022_041926_182199/phpunit_mariadb.log` |
-| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 145 | 471 | 0 | 1 | **PASS** | `reports/runs/run_20261022_041926_182199/phpunit_pgsql.log` |
+| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 145 | 478 | 0 | 0 | **PASS** | `reports/runs/run_20261022_044929_199819/phpunit_sqlite.log` |
+| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 145 | 474 | 0 | 2 | **PASS** | `reports/runs/run_20261022_044929_199819/phpunit_mysql.log` |
+| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 145 | 474 | 0 | 2 | **PASS** | `reports/runs/run_20261022_044929_199819/phpunit_mariadb.log` |
+| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 145 | 477 | 0 | 1 | **PASS** | `reports/runs/run_20261022_044929_199819/phpunit_pgsql.log` |
 
 ---
 
