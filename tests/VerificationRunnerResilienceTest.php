@@ -43,18 +43,19 @@ class VerificationRunnerResilienceTest extends TestCase
 
     public function test_simultaneous_verification_runs_are_prevented(): void
     {
-        $lockFile = "{$this->rootDir}/.agents/verify-release.lock";
-        $fp = fopen($lockFile, 'w+');
+        $tmpLock = sys_get_temp_dir().'/verify-test-'.uniqid().'.lock';
+        $fp = fopen($tmpLock, 'w+');
         $this->assertIsResource($fp);
         $locked = flock($fp, LOCK_EX | LOCK_NB);
         $this->assertTrue($locked, 'Failed to acquire test lock');
 
         $output = [];
         $exitCode = 0;
-        exec("bash {$this->rootDir}/scripts/verify-release.sh 2>&1", $output, $exitCode);
+        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh 2>&1", $output, $exitCode);
 
         flock($fp, LOCK_UN);
         fclose($fp);
+        unlink($tmpLock);
 
         $this->assertNotEquals(0, $exitCode);
         $this->assertStringContainsString('Another verification run is currently in progress', implode("\n", $output));
@@ -66,6 +67,7 @@ class VerificationRunnerResilienceTest extends TestCase
         mkdir($tmpDir);
         $binDir = $tmpDir.'/bin';
         mkdir($binDir);
+        $tmpLock = $tmpDir.'/custom.lock';
 
         // Mock failing composer command
         file_put_contents($binDir.'/composer', "#!/usr/bin/env bash\necho 'Mock Composer validation error' >&2\nexit 1\n");
@@ -73,11 +75,12 @@ class VerificationRunnerResilienceTest extends TestCase
 
         $output = [];
         $exitCode = 0;
-        exec("PATH=\"{$binDir}:\$PATH\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" PATH=\"{$binDir}:\$PATH\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
         // Clean up mock
         unlink($binDir.'/composer');
         rmdir($binDir);
+        @unlink($tmpLock);
         rmdir($tmpDir);
 
         $this->assertNotEquals(0, $exitCode);
@@ -90,6 +93,7 @@ class VerificationRunnerResilienceTest extends TestCase
         mkdir($tmpDir);
         $binDir = $tmpDir.'/bin';
         mkdir($binDir);
+        $tmpLock = $tmpDir.'/custom.lock';
 
         // Mock composer: validation passes, but audit fails
         file_put_contents($binDir.'/composer', "#!/usr/bin/env bash\nif [ \"\$1\" = \"validate\" ]; then exit 0; fi\necho 'Mock security vulnerability found' >&2\nexit 1\n");
@@ -97,10 +101,11 @@ class VerificationRunnerResilienceTest extends TestCase
 
         $output = [];
         $exitCode = 0;
-        exec("PATH=\"{$binDir}:\$PATH\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" PATH=\"{$binDir}:\$PATH\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
         unlink($binDir.'/composer');
         rmdir($binDir);
+        @unlink($tmpLock);
         rmdir($tmpDir);
 
         $this->assertNotEquals(0, $exitCode);
@@ -112,6 +117,7 @@ class VerificationRunnerResilienceTest extends TestCase
         $pintPath = "{$this->rootDir}/vendor/bin/pint";
         $backupPath = $pintPath.'.bak-test';
         rename($pintPath, $backupPath);
+        $tmpLock = sys_get_temp_dir().'/pint-test-'.uniqid().'.lock';
 
         // Mock failing pint
         file_put_contents($pintPath, "#!/usr/bin/env bash\necho 'Mock Pint style violation' >&2\nexit 1\n");
@@ -119,10 +125,11 @@ class VerificationRunnerResilienceTest extends TestCase
 
         $output = [];
         $exitCode = 0;
-        exec("bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
         unlink($pintPath);
         rename($backupPath, $pintPath);
+        @unlink($tmpLock);
 
         $this->assertNotEquals(0, $exitCode);
         $this->assertStringContainsString('Running Pint Code Style Verification...', implode("\n", $output));
@@ -133,6 +140,7 @@ class VerificationRunnerResilienceTest extends TestCase
         $phpstanPath = "{$this->rootDir}/vendor/bin/phpstan";
         $backupPath = $phpstanPath.'.bak-test';
         rename($phpstanPath, $backupPath);
+        $tmpLock = sys_get_temp_dir().'/phpstan-test-'.uniqid().'.lock';
 
         // Mock failing phpstan
         file_put_contents($phpstanPath, "#!/usr/bin/env bash\necho 'Mock PHPStan static analysis error' >&2\nexit 1\n");
@@ -140,10 +148,11 @@ class VerificationRunnerResilienceTest extends TestCase
 
         $output = [];
         $exitCode = 0;
-        exec("bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
         unlink($phpstanPath);
         rename($backupPath, $phpstanPath);
+        @unlink($tmpLock);
 
         $this->assertNotEquals(0, $exitCode);
         $this->assertStringContainsString('Running PHPStan Static Analysis', implode("\n", $output));
@@ -154,6 +163,7 @@ class VerificationRunnerResilienceTest extends TestCase
         $phpunitPath = "{$this->rootDir}/vendor/bin/phpunit";
         $backupPath = $phpunitPath.'.bak-test';
         rename($phpunitPath, $backupPath);
+        $tmpLock = sys_get_temp_dir().'/phpunit-test-'.uniqid().'.lock';
 
         // Mock failing phpunit
         file_put_contents($phpunitPath, "#!/usr/bin/env bash\necho 'Mock PHPUnit test failure' >&2\nexit 1\n");
@@ -161,10 +171,11 @@ class VerificationRunnerResilienceTest extends TestCase
 
         $output = [];
         $exitCode = 0;
-        exec("bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+        exec("VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
 
         unlink($phpunitPath);
         rename($backupPath, $phpunitPath);
+        @unlink($tmpLock);
 
         $this->assertNotEquals(0, $exitCode);
         $this->assertStringContainsString('Running Local PHPUnit Test Suite on SQLite...', implode("\n", $output));

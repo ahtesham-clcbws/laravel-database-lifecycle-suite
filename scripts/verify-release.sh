@@ -40,8 +40,8 @@ for arg in "$@"; do
 done
 
 # Concurrency Guard: prevent concurrent runs from corrupting runs and reports
-LOCK_FILE="${ROOT_DIR}/.agents/verify-release.lock"
-mkdir -p "${ROOT_DIR}/.agents"
+LOCK_FILE="${VERIFY_LOCK_FILE:-${ROOT_DIR}/.agents/verify-release.lock}"
+mkdir -p "$(dirname "${LOCK_FILE}")"
 exec 200>"${LOCK_FILE}"
 if ! flock -n 200; then
     echo "ERROR: Another verification run is currently in progress (Lock: ${LOCK_FILE})." >&2
