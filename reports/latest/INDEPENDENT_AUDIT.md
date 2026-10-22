@@ -3,7 +3,7 @@
 **Date**: 2026-10-22  
 **Target Source Revision (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
 **Certified Evidence Revision (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`  
-**Current Release Candidate Revision (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `37a6231ce47511253b53cbbb409e617378cea438`  
+**Current Release Candidate Revision (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `2812db7bf01ca908e50799d1e706452959b5a05d`  
 **Evidence Run Reference**: `run_20261022_090800_295758`  
 **Audit Scope**: Complete static AST analysis, fail-closed boundaries, Artisan command interfaces, SQL lexical safety, multi-database engine adapters, application generation pipelines, and evidence integrity validation.
 

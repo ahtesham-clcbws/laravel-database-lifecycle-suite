@@ -7,7 +7,7 @@
     "model": "two_revision_verification",
     "source_sha": "fecea8d4ff2f849b088c9cb6244bd5d1417039b0",
     "certified_evidence_sha": "e13a2e4fd035c6761b1f88e84ae6708db377b4ea",
-    "current_release_candidate_sha": "37a6231ce47511253b53cbbb409e617378cea438",
+    "current_release_candidate_sha": "2812db7bf01ca908e50799d1e706452959b5a05d",
     "evidence_only_diff_gate": "PASS",
     "ci_run_id": "39741386110",
     "ci_run_url": "https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110",
@@ -22,7 +22,7 @@
     "commit_count": 70,
     "source_sha": "fecea8d4ff2f849b088c9cb6244bd5d1417039b0",
     "certified_evidence_sha": "e13a2e4fd035c6761b1f88e84ae6708db377b4ea",
-    "current_release_candidate_sha": "37a6231ce47511253b53cbbb409e617378cea438"
+    "current_release_candidate_sha": "2812db7bf01ca908e50799d1e706452959b5a05d"
   },
   "runtime": {
     "php": "PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)",

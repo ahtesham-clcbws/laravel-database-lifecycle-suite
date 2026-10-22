@@ -5,7 +5,7 @@ Generated automatically from verified release run `run_20261022_090800_295758`.
 ## System & Runtime Environment
 - **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`
 - **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`
-- **Current Candidate SHA**: `37a6231ce47511253b53cbbb409e617378cea438`
+- **Current Candidate SHA**: `2812db7bf01ca908e50799d1e706452959b5a05d`
 - **Branch**: `development`
 - **PHP**: `PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)`
 - **Composer**: `Composer version 2.10.3 2026-08-27 13:34:23`

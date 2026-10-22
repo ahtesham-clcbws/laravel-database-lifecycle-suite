@@ -5,7 +5,7 @@
 **Certification Model**: Two-Revision Verification Architecture  
 **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
 **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`  
-**Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `37a6231ce47511253b53cbbb409e617378cea438`  
+**Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `2812db7bf01ca908e50799d1e706452959b5a05d`  
 **Evaluated Run ID**: `run_20261022_090800_295758`  
 **Overall Status**: **PASS (CERTIFIED)**  
 **Local Test Suite**: 149 tests, 492 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
@@ -109,7 +109,7 @@ Status: **100% Success across all 12 jobs**
 - **Starting Branch**: `development`
 - **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`
 - **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`
-- **Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `37a6231ce47511253b53cbbb409e617378cea438`
+- **Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `2812db7bf01ca908e50799d1e706452959b5a05d`
 - **Evidence-Only Diff Gate**: Automated verification via `scripts/validate-evidence-diff.sh`
 - **Working Tree**: Clean
 - **Boundary Check**:

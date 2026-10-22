@@ -6,7 +6,7 @@
 **Overall Status**: **PASS**  
 **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`  
 **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`  
-**Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `37a6231ce47511253b53cbbb409e617378cea438`  
+**Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `2812db7bf01ca908e50799d1e706452959b5a05d`  
 **Branch**: `development`  
 **Total Commits on Branch**: 70
 

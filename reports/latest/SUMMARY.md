@@ -3,7 +3,7 @@
 - **Run ID**: `run_20261022_090800_295758`
 - **Certified Source Commit (`SOURCE_SHA`)**: `fecea8d4ff2f849b088c9cb6244bd5d1417039b0`
 - **Certified Evidence Commit (`CERTIFIED_EVIDENCE_SHA`)**: `e13a2e4fd035c6761b1f88e84ae6708db377b4ea`
-- **Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `37a6231ce47511253b53cbbb409e617378cea438`
+- **Current Release Candidate Commit (`CURRENT_RELEASE_CANDIDATE_SHA`)**: `2812db7bf01ca908e50799d1e706452959b5a05d`
 - **Branch**: `development`
 - **Model**: Two-revision verification (`SOURCE_SHA` vs `CERTIFIED_EVIDENCE_SHA` / `CURRENT_RELEASE_CANDIDATE_SHA`)
 - **CI Proof**: [Run #39741386110](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39741386110) (100% PASS across 12 jobs for `SOURCE_SHA`), [Run #39745618000](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39745618000) (100% PASS across 12 jobs for `CERTIFIED_EVIDENCE_SHA`)
