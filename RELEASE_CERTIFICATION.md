@@ -2,8 +2,8 @@
 
 **Target Branch**: `development`  
 **Master Branch**: `master` (Untouched, 0 modifications, no merges performed)  
-**Evaluated Run ID**: `run_20261022_055359_232158`  
-**Starting / Final Head SHA**: `4f7f7071b4a60ab784f2dc2bc21269354f229ed8`  
+**Evaluated Run ID**: `run_20261022_061330_239634`  
+**Starting / Final Head SHA**: `b765d6f49f5c007ccbef561ba847ec2c471910f6`  
 **Overall Status**: **100% PASS (CERTIFIED)**  
 **Local Test Suite**: 147 tests, 486 assertions passed (0 failures, 0 errors) across full matrix (Laravel 11, 12, & 13)
 
@@ -34,10 +34,10 @@
 
 | Engine | Version | PHP | Laravel | Tests | Assertions | Failed | Skipped | Status | Log / Run Context |
 |---|---|---|---|---|---|---|---|---|---|
-| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 147 | 486 | 0 | 0 | **PASS** | `reports/runs/run_20261022_055359_232158/phpunit_sqlite.log` |
-| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 147 | 482 | 0 | 2 | **PASS** | `reports/runs/run_20261022_055359_232158/phpunit_mysql.log` |
-| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 147 | 482 | 0 | 2 | **PASS** | `reports/runs/run_20261022_055359_232158/phpunit_mariadb.log` |
-| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 147 | 485 | 0 | 1 | **PASS** | `reports/runs/run_20261022_055359_232158/phpunit_pgsql.log` |
+| **SQLite** | 3.54.0 (In-memory/File) | 8.5.11 | 13.x / 12.x / 11.x | 147 | 486 | 0 | 0 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_sqlite.log` |
+| **MySQL** | 8.4.2 (Isolated Service) | 8.5.11 | 13.x / 12.x | 147 | 482 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mysql.log` |
+| **MariaDB** | 13.0.2-MariaDB (Isolated Service) | 8.5.11 | 13.x / 12.x | 147 | 482 | 0 | 2 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_mariadb.log` |
+| **PostgreSQL** | 18.6 (Local Service) | 8.5.11 | 13.x / 12.x | 147 | 485 | 0 | 1 | **PASS** | `reports/runs/run_20261022_061330_239634/phpunit_pgsql.log` |
 
 ---
 
@@ -54,26 +54,26 @@
 
 ---
 
-## D. CI Verification Evidence (Run #39731222181)
+## D. CI Verification Evidence (Run #39731438810)
 
-Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181)  
-Commit: `f9e667e5dd82369273c80b9f21b9d6d5dd994863`  
+Workflow: [https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810)  
+Commit: `b765d6f49f5c007ccbef561ba847ec2c471910f6`  
 Status: **100% Success across all 12 jobs**
 
 | Job Name | Job ID | Status | URL |
 |---|---|---|---|
-| **Code Quality (Pint & PHPStan)** | 119666481008 | ✅ Success | [Job 119666481008](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481008) |
-| **PostgreSQL Integration** | 119666481358 | ✅ Success | [Job 119666481358](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481358) |
-| **MySQL Integration** | 119666481335 | ✅ Success | [Job 119666481335](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481335) |
-| **MariaDB Integration** | 119666481347 | ✅ Success | [Job 119666481347](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481347) |
-| **PHP 8.2 - L11.*** | 119666481363 | ✅ Success | [Job 119666481363](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481363) |
-| **PHP 8.2 - L12.*** | 119666481373 | ✅ Success | [Job 119666481373](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481373) |
-| **PHP 8.3 - L11.*** | 119666481457 | ✅ Success | [Job 119666481457](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481457) |
-| **PHP 8.3 - L12.*** | 119666481857 | ✅ Success | [Job 119666481857](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481857) |
-| **PHP 8.3 - L13.*** | 119666481378 | ✅ Success | [Job 119666481378](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481378) |
-| **PHP 8.4 - L11.*** | 119666481440 | ✅ Success | [Job 119666481440](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481440) |
-| **PHP 8.4 - L12.*** | 119666481314 | ✅ Success | [Job 119666481314](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481314) |
-| **PHP 8.4 - L13.*** | 119666481387 | ✅ Success | [Job 119666481387](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731222181/job/119666481387) |
+| **Code Quality (Pint & PHPStan)** | 119667153276 | ✅ Success | [Job 119667153276](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153276) |
+| **PostgreSQL Integration** | 119667153222 | ✅ Success | [Job 119667153222](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153222) |
+| **MySQL Integration** | 119667153128 | ✅ Success | [Job 119667153128](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153128) |
+| **MariaDB Integration** | 119667152989 | ✅ Success | [Job 119667152989](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667152989) |
+| **PHP 8.2 - L11.*** | 119667153255 | ✅ Success | [Job 119667153255](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153255) |
+| **PHP 8.2 - L12.*** | 119667153264 | ✅ Success | [Job 119667153264](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153264) |
+| **PHP 8.3 - L11.*** | 119667153257 | ✅ Success | [Job 119667153257](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153257) |
+| **PHP 8.3 - L12.*** | 119667153136 | ✅ Success | [Job 119667153136](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153136) |
+| **PHP 8.3 - L13.*** | 119667153308 | ✅ Success | [Job 119667153308](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153308) |
+| **PHP 8.4 - L11.*** | 119667153238 | ✅ Success | [Job 119667153238](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153238) |
+| **PHP 8.4 - L12.*** | 119667153270 | ✅ Success | [Job 119667153270](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153270) |
+| **PHP 8.4 - L13.*** | 119667153237 | ✅ Success | [Job 119667153237](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions/runs/39731438810/job/119667153237) |
 
 ---
 
