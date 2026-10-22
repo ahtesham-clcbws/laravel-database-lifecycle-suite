@@ -1,25 +1,30 @@
 # Laravel Database Lifecycle Suite
 
-[![Latest Version on GitHub](https://img.shields.io/github/v/release/ahtesham-clcbws/laravel-database-lifecycle-suite?include_prereleases&style=flat-square)](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/releases)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/clcbws/laravel-database-lifecycle-suite.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-database-lifecycle-suite)
+[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/ahtesham-clcbws/laravel-database-lifecycle-suite/ci.yml?branch=master&label=tests&style=flat-square)](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/actions)
 [![Total Downloads](https://img.shields.io/packagist/dt/clcbws/laravel-database-lifecycle-suite.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-database-lifecycle-suite)
+[![Monthly Downloads](https://img.shields.io/packagist/dm/clcbws/laravel-database-lifecycle-suite.svg?style=flat-square)](https://packagist.org/packages/clcbws/laravel-database-lifecycle-suite)
+[![GitHub Stars](https://img.shields.io/github/stars/ahtesham-clcbws/laravel-database-lifecycle-suite?style=flat-square)](https://github.com/ahtesham-clcbws/laravel-database-lifecycle-suite/stargazers)
 [![License](https://img.shields.io/github/license/ahtesham-clcbws/laravel-database-lifecycle-suite?style=flat-square)](LICENSE.md)
+[![PHPStan Level](https://img.shields.io/badge/PHPStan-level%205-brightgreen?style=flat-square)](phpstan.neon)
+[![Code Style](https://img.shields.io/badge/code%20style-pint-blue?style=flat-square)](https://laravel.com/docs/pint)
 
-**Laravel Database Lifecycle Suite** is a database management, auditing, and reverse-engineering toolkit for Laravel applications. It provides visibility into schema consistency, index efficiency, reference data drift, and database health metrics.
+**Laravel Database Lifecycle Suite** is an enterprise-grade database management, architectural auditing, and safe reverse-engineering toolkit for Laravel applications. It provides deep visibility into database health metrics, schema consistency, redundant index detection, query plan safety, and reference data synchronization across SQLite, MySQL, MariaDB, and PostgreSQL.
 
 ---
 
 ## 📋 Compatibility Matrix
 
-- **PHP**: `^8.2` (Verified across PHP 8.2, 8.3, 8.4, and 8.5)
+- **PHP**: `^8.2`, `^8.3`, `^8.4` (Tested and verified across PHP 8.2 through 8.5)
 - **Framework**: Laravel `11.x`, `12.x`, and `13.x`
-- **Supported Databases**:
+- **Supported Database Engines**:
   - SQLite (3.35+)
   - MySQL (8.0+)
   - MariaDB (10.6+)
   - PostgreSQL (14+)
 
 > [!NOTE]
-> **Laravel 11, 12 & 13 Support Statement**: Laravel 11.x, 12.x, and 13.x are all supported and verified via real-world application integration tests across Scenarios A through L (schema snapshots, drift detection, seeder safety, and model generation). Note that Laravel 13 requires PHP ^8.3+. On PHP 8.2 systems, Laravel 11 or 12 is automatically resolved.
+> **Laravel 11, 12 & 13 Support Statement**: Laravel 11.x, 12.x, and 13.x are fully supported and verified via real-world application integration tests across Scenarios A through L (schema snapshots, drift detection, seeder safety, and model generation). Note that Laravel 13 requires PHP ^8.3+. On PHP 8.2 environments, Composer resolves Laravel 11.x or 12.x.
 
 ---
 
@@ -27,22 +32,23 @@
 
 1. **Schema Snapshots are NOT Data Backups**:
    - Schema snapshots capture structural definitions (tables, columns, primary keys, indexes, foreign keys).
-   - Snapshots contain **no table rows, data records, or secrets**.
+   - Snapshots contain **no table rows, data records, credentials, or secrets**.
    - Restoring a snapshot will not recover lost data.
-2. **Safe Seeder Scaffolds**:
+2. **Safe Seeder Scaffolds (Zero Live Data Leaks)**:
    - `LegacyBridge` generates empty, safe seeders with placeholder documentation.
    - Live application data, user credentials, tokens, and PII are never exported to generated PHP files.
 3. **Destructive Restore Protection**:
    - Snapshot restoration is non-destructive by default and skips existing tables without dropping them.
-   - Dropping and recreating existing tables (`--recreate`) is strictly blocked in production environments. Even `--force` cannot bypass this block in production. In non-production environments, `--recreate` requires explicit user confirmation or `--force`.
+   - Dropping and recreating existing tables (`--recreate`) is strictly blocked in production environments (`app()->environment('production')`). Even `--force` cannot bypass this block in production. In non-production environments, `--recreate` requires explicit user confirmation or `--force`.
 4. **Preflight Validation & Path Traversal Prevention**:
    - Snapshot restoration conducts complete preflight validation across all tables before making any database modifications.
-   - Snapshot filenames are sanitized against directory traversal attacks.
-5. **Heuristic PII Auditing**:
-   - PII detection uses regex naming conventions (`email`, `phone`, `ssn`, `card`). It is an advisory tool and does not inspect table contents.
-6. **Zero-Trust Dependency Security**:
-   - Broad package-level advisory exceptions are prohibited. All production dependencies are continuously scanned with `composer audit` and `composer validate --strict`.
-   - Historical upstream EOL advisories for Laravel 11 matrix compatibility are explicitly pinned by advisory ID (`policy.advisories.ignore-id` and `audit.ignore`), preventing unvetted security drift while preserving full auditing across all active components.
+   - Snapshot filenames are sanitized against directory traversal attacks via strict regex matching (`^[a-zA-Z0-9_\-\.]+$`).
+5. **Pessimistic Locking & Competing Insert Rejection**:
+   - Data drift synchronization executes within transactions using `lockForUpdate()`. Competing inserts during review are detected and rejected to prevent silent row overwrites.
+6. **Strict Read-Only Query Analyzer**:
+   - The query plan analyzer strips SQL comments, quotes literals, and rejects mutating CTEs (`INSERT`, `UPDATE`, `DELETE`, etc.), locking clauses (`FOR UPDATE`), administrative commands, and dollar quoting.
+7. **Zero-Trust Dependency Security**:
+   - Active dependencies in `composer.lock` are continuously verified with native `composer audit` and `composer validate --strict` reporting 0 vulnerabilities.
 
 ---
 
@@ -80,16 +86,16 @@ The published config file `config/database-lifecycle-suite.php` includes:
 
 ---
 
-## 🚀 Commands & Usage
+## 🚀 Commands & Features
 
-### 1. Database Lifecycle Scorecard
-Runs an audit across all lifecycle dimensions and returns an overall health score:
+### 1. Database Lifecycle Scorecard (`db:lifecycle-status`)
+Runs a comprehensive audit across all lifecycle dimensions and returns an overall health score:
 
 ```bash
 # Terminal table output
 php artisan db:lifecycle-status
 
-# CI-friendly strict exit code (fails if any check fails)
+# CI-friendly strict exit code (returns exit code 1 if any check fails)
 php artisan db:lifecycle-status --strict
 
 # Machine-readable JSON output
@@ -98,95 +104,104 @@ php artisan db:lifecycle-status --format=json
 
 Status badges reported per check:
 - `PASS`: Healthy and compliant.
-- `WARNING`: Advisory non-critical drift detected.
-- `FAIL`: Structural defect or unindexed foreign key detected.
-- `SKIPPED`: Optional dependency not installed (e.g., Schema Sentinel).
-- `NOT CONFIGURED`: Aspect not yet configured (e.g., `data_audit_tables`).
-- `ERROR`: An exception occurred during execution.
+- `WARNING`: Advisory recommendation (e.g. minor convention discrepancy).
+- `FAIL`: Structural defect or optimization gap detected.
+- `SKIPPED`: Optional integration (e.g. Schema Sentinel not present).
 
-### 2. Schema Snapshots & Safe Restoration
-Capture, compare, and restore structural schemas:
+---
+
+### 2. Schema Snapshot & Restoration (`db:snapshot`, `db:snapshot-diff`, `db:snapshot-restore`)
+Capture structural schemas into deterministic JSON files, inspect schema drift between snapshots or against live databases, and safely restore:
 
 ```bash
-# Capture schema state
-php artisan db:snapshot baseline
+# Capture live schema
+php artisan db:snapshot initial_schema
 
-# Compare snapshots or compare snapshot against live database
-php artisan db:snapshot-diff baseline --live
+# Diff live database against a captured snapshot
+php artisan db:snapshot-diff initial_schema --live
 
-# Dry-run restoration preview (modifies nothing)
-php artisan db:snapshot-restore baseline --dry-run
+# Compare two snapshots on disk
+php artisan db:snapshot-diff baseline_v1 v2_candidate
 
-# Safe restoration (creates missing tables without dropping existing ones)
-php artisan db:snapshot-restore baseline
+# Dry-run restoration (preview changes without modifying database)
+php artisan db:snapshot-restore initial_schema --dry-run
 
-# Destructive recreation (drops and recreates tables with safeguards)
-php artisan db:snapshot-restore baseline --recreate
+# Non-destructive restoration (skips existing tables)
+php artisan db:snapshot-restore initial_schema
+
+# Destructive recreation (DROPS and recreates existing tables; BLOCKED in production)
+php artisan db:snapshot-restore initial_schema --recreate
 ```
 
-### 3. Data Drift Deep Dive
-Compares row data in lookup/reference tables between source and destination connections:
+---
+
+### 3. Legacy Bridge Reverse Engineering (`db:legacy-bridge`)
+Reverse-engineer an existing database into modular Laravel artifacts (migrations, Eloquent models with relations, 100% synthetic seeders, and factories):
 
 ```bash
-# Audit reference tables for drift
-php artisan db:data-drift --source=production --table=roles
-
-# Fail in CI if drift exists
-php artisan db:data-drift --source=production --table=roles --strict
-
-# Interactive synchronization with diff previews
-php artisan db:data-drift --source=production --table=roles --fix
-```
-
-### 4. Legacy Bridge (Reverse-Engineering)
-Generates Eloquent models, migrations, factories, and safe seeder scaffolds from existing database tables:
-
-```bash
-# Reverse-engineer all tables on default connection
+# Reverse-engineer all tables
 php artisan db:legacy-bridge
 
-# Reverse-engineer specific connection and tables
-php artisan db:legacy-bridge --database=legacy_db --tables=users,orders,order_items
+# Reverse-engineer specific tables
+php artisan db:legacy-bridge --tables=users,orders,products
+
+# Overwrite existing generated artifacts
+php artisan db:legacy-bridge --force
 ```
 
-Features:
-- Preserves primary keys, composite keys, and custom column types.
-- Disambiguates relationship method names when multiple foreign keys target the same table.
-- Generates safe seeder scaffolds with zero live data exposure.
-- Preserves `onDelete` and `onUpdate` foreign key actions.
+---
 
-### 5. Index Standardization & Optimization
-Audit and align indexes with naming standards and database performance:
+### 4. Reference Data Drift Detector (`db:data-drift`)
+Detect and synchronize reference/lookup table data drift across connections:
 
 ```bash
-# Audit index names against naming convention
-php artisan db:standardize-indexes --dry-run
+# Detect data drift between live database and source
+php artisan db:data-drift --source=central_db --table=roles
 
-# Rename non-standard indexes (with collision prevention)
-php artisan db:standardize-indexes
+# Strict mode for CI
+php artisan db:data-drift --source=central_db --table=roles --strict
 
-# Detect unindexed foreign keys and potential foreign key columns
+# Interactively review and apply drift fixes with pessimistic locking
+php artisan db:data-drift --source=central_db --table=roles --fix
+```
+
+---
+
+### 5. Index Auditing & Standardization (`db:index-audit`, `db:index-redundancy`, `db:standardize-indexes`)
+Detect missing foreign key indexes, locate overlapping or redundant indexes, and standardize index names across all tables:
+
+```bash
+# Detect foreign keys missing an index
 php artisan db:index-audit --strict
 
-# Detect redundant / overlapping composite indexes
+# Scan for overlapping/redundant secondary indexes
 php artisan db:index-redundancy --strict
+
+# Preview index name standardization changes
+php artisan db:standardize-indexes --dry-run
+
+# Apply index name standardization
+php artisan db:standardize-indexes
 ```
 
-### 6. Read-Only Query Analyzer
-Inspect SQL execution plans using driver-appropriate EXPLAIN syntax:
+---
+
+### 6. Read-Only Query Plan Analyzer (`db:explain`)
+Analyze SQL execution plans safely across database engines:
 
 ```bash
-php artisan db:explain "SELECT * FROM users WHERE email = 'test@example.com'"
+php artisan db:explain "SELECT * FROM users WHERE email = 'admin@example.com'"
 ```
 
-Supported Drivers:
-- **SQLite**: Parses `EXPLAIN QUERY PLAN` for table scans and index usage.
-- **MySQL / MariaDB**: Evaluates `EXPLAIN` for full scans, temporary tables, and filesorts.
-- **PostgreSQL**: Evaluates `EXPLAIN` for sequential scans and sort algorithms.
+- **SQLite**: Formats query plan with index usage details.
+- **MySQL / MariaDB**: Evaluates `EXPLAIN` for full table scans, filesorts, and temporary tables.
+- **PostgreSQL**: Evaluates `EXPLAIN` for sequential scans and execution costs.
 
-*Safety note: Only read-only `SELECT` and `WITH` statements are permitted. Multi-statement queries are strictly rejected.*
+*Safety invariant: Strictly enforces read-only `SELECT` and non-recursive `WITH ... SELECT` queries. Mutating CTEs and locking clauses are rejected fail-closed.*
 
-### 7. Additional Schema & Model Auditors
+---
+
+### 7. Structural & Integrity Audits
 
 ```bash
 # Audit Eloquent $casts against database column types
@@ -201,6 +216,9 @@ php artisan db:column-type-audit --strict
 # Audit table naming conventions (snake_case plural)
 php artisan db:convention-audit --strict
 
+# Scan table columns heuristically for PII (names, emails, phones, SSNs)
+php artisan db:pii-scan --strict
+
 # Report physical disk sizes and row counts
 php artisan db:size-report
 
@@ -213,71 +231,30 @@ php artisan db:erd --output=docs/schema.mmd
 
 ---
 
-## 🔌 Compatibility & Roadmap
+## 🧪 Testing & Verification
 
-| Platform / Component | Supported Versions | Notes |
-| :--- | :--- | :--- |
-| **PHP** | `^8.2 \| ^8.3 \| ^8.4` | Verified in multi-version test matrix |
-| **Laravel Framework** | `^11.0 \| ^12.0 \| ^13.0` | Verified on Laravel 11.x, 12.x, and 13.x |
-| **Database Engines** | SQLite 3, MySQL 8.0+, MariaDB 11.4+, PostgreSQL 16+ | Integration tested via automated CI containers |
-| **Laravel 13** | Fully Supported | Verified in fresh application integration harness (requires PHP ^8.3+) |
-
-### 🛡️ Safety Boundaries & Unsupported Features
-
-- **Dependency Security**:
-  - Zero vulnerability advisory bypasses or ignored security policies in `composer.json`. Native `composer audit` is enforced strictly in CI without exceptions.
-
-- **Schema Restoration Safe Boundaries**:
-  - Automatically identifies and rejects lossy or unportable features before mutating databases (virtual/generated columns, unsupported vendor geometry/blob types, and incompatible foreign key actions like `SET DEFAULT` on MySQL).
-  - Explicit integer primary keys and column signedness (including `unsigned` integers) are preserved without distortion.
-  - Destructive recreation (`--recreate`) is strictly blocked in production environments.
-  - *MySQL/MariaDB Implicit DDL Commits*: MySQL auto-commits active transactions upon executing DDL statements (`CREATE TABLE`, `DROP TABLE`). To prevent partial restorations, the suite executes complete preflight validation across the snapshot prior to issuing any DDL commands.
-
-- **Query Analyzer Safe Subset**:
-  - The Query Analyzer strictly enforces a safe, read-only query subset.
-  - Queries must be standard `SELECT` or non-recursive `WITH ... AS (SELECT ...) SELECT ...`.
-  - The following constructs are strictly rejected:
-    - Modifying DDL / DML (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`, `MERGE`, etc.)
-    - Administrative & engine control commands (`PRAGMA`, `ATTACH`, `DETACH`, `SET`, `SHOW`, `KILL`, `SHUTDOWN`, etc.)
-    - Transaction control (`COMMIT`, `ROLLBACK`, `BEGIN`, `START`, `SAVEPOINT`)
-    - Locking clauses (`FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`, `GET_LOCK()`)
-    - Dollar-quoted strings (`$$...$$` in PostgreSQL)
-    - Side-effecting execution functions (`SLEEP()`, `PG_SLEEP()`, `BENCHMARK()`)
-    - Chained / multi-statement SQL (semicolons outside string literals)
-    - Unclosed comments (`/*`) or unmatched quotations
-
-- **Test Database Isolation & Ownership**:
-  - Test suites enforce fail-closed disposable database protection: cleanup runs only when `allow_destructive_test_cleanup` is enabled, environment is `'testing'`, host is on an approved local/container whitelist, and database identifiers pass strict alphanumeric validation (`^[a-zA-Z0-9_]{1,63}$`) preventing SQL injection.
-  - *Ownership flags alone are never proof*: Well-known production or system database names (`production`, `app`, `laravel`, `mysql`, `postgres`, etc.) are unconditionally rejected even if ownership flags are present.
-  - Mandatory runtime socket database identities are verified via live engine queries (`SELECT DATABASE()` / `SELECT current_database()`) and fail closed on unverified identities or socket errors.
-  - Source and destination connections must be independently provisioned and verified as isolated to prevent unintended shared database drops.
-
----
-
-## 🧪 Testing
-
-Execute test suite:
+Execute full test suite:
 
 ```bash
 composer test
 ```
 
-Run code formatting check:
+Run code formatting check (Laravel Pint):
 
 ```bash
 composer lint
 ```
 
-Run static analysis (PHPStan):
+Run static analysis (PHPStan Level 5):
 
 ```bash
 composer analyze
 ```
 
-Execute full offline local CI verification suite (Pint, PHPStan, Composer Audit, SQLite, and PostgreSQL):
+Execute comprehensive local release verification (Multi-engine database matrix, Pint, PHPStan, Composer Audit, and Laravel integration harness):
 
 ```bash
-composer test:ci
+bash scripts/verify-release.sh --database=all --laravel=all
 ```
 
 ---
