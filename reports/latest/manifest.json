@@ -1,13 +1,13 @@
 {
-  "run_id": "run_20261022_051546_214735",
-  "start_time": "2026-10-22 05:15:46 UTC",
-  "end_time": "2026-10-22 05:21:28 UTC",
+  "run_id": "run_20261022_055359_232158",
+  "start_time": "2026-10-22 05:53:59 UTC",
+  "end_time": "2026-10-22 05:58:14 UTC",
   "overall_status": "PASS",
   "git": {
-    "commit": "cb3bd1a82127e43083681c25120f26745bfe3f6c",
+    "commit": "4f7f7071b4a60ab784f2dc2bc21269354f229ed8",
     "branch": "development",
-    "worktree_clean": 1,
-    "commit_count": 57
+    "worktree_clean": 0,
+    "commit_count": 60
   },
   "runtime": {
     "php": "PHP 8.5.11 (cli) (built: Oct 14 2026 08:12:28) (NTS)",
@@ -34,9 +34,9 @@
     "app_integration_laravel_13": "PASS"
   },
   "test_metrics": {
-    "sqlite": {"tests":147,"assertions":485,"skipped":0,"failures":0},
-    "mysql": {"tests":147,"assertions":481,"skipped":2,"failures":0},
-    "mariadb": {"tests":147,"assertions":481,"skipped":2,"failures":0},
-    "postgresql": {"tests":147,"assertions":484,"skipped":1,"failures":0}
+    "sqlite": {"tests":147,"assertions":486,"skipped":0,"failures":0},
+    "mysql": {"tests":147,"assertions":482,"skipped":2,"failures":0},
+    "mariadb": {"tests":147,"assertions":482,"skipped":2,"failures":0},
+    "postgresql": {"tests":147,"assertions":485,"skipped":1,"failures":0}
   }
 }
