@@ -21,10 +21,10 @@ Integration tests execute full migrations, schema captures, round-trip restorati
 
 | Engine | Verified Version | Connection Type | Tests Executed | Assertions | Result |
 |---|---|---|---|---|---|
-| **SQLite** | 3.54.0 | In-memory & File-based | 147 | 485 | **PASS (0 failures)** |
-| **MySQL** | 8.4.2 (Isolated Disposable Service) | TCP PDO (Port 3308) | 147 | 481 (2 driver-specific skips) | **PASS (0 failures)** |
-| **MariaDB** | 13.0.2-MariaDB (Isolated Disposable Service) | TCP PDO (Port 3307) | 147 | 481 (2 driver-specific skips) | **PASS (0 failures)** |
-| **PostgreSQL** | 18.6 (Local Service) | TCP / Socket PDO (Port 5432) | 147 | 484 (1 driver-specific skip) | **PASS (0 failures)** |
+| **SQLite** | 3.54.0 | In-memory & File-based | 147 | 486 | **PASS (0 failures)** |
+| **MySQL** | 8.4.2 (Isolated Disposable Service) | TCP PDO (Port 3308) | 147 | 482 (2 driver-specific skips) | **PASS (0 failures)** |
+| **MariaDB** | 13.0.2-MariaDB (Isolated Disposable Service) | TCP PDO (Port 3307) | 147 | 482 (2 driver-specific skips) | **PASS (0 failures)** |
+| **PostgreSQL** | 18.6 (Local Service) | TCP / Socket PDO (Port 5432) | 147 | 485 (1 driver-specific skip) | **PASS (0 failures)** |
 
 *\*Note on driver-specific skipped tests*:
 - In PostgreSQL: `test_it_permits_backtick_quoted_identifiers` is skipped because backtick quoting (`` `column` ``) is MySQL/MariaDB syntax, whereas PostgreSQL adheres to ANSI standard double quotes (`"`).
@@ -32,16 +32,18 @@ Integration tests execute full migrations, schema captures, round-trip restorati
 
 ---
 
-## 3. GitHub Actions CI Matrix Proof (Run #39574634984)
+## 3. GitHub Actions CI Matrix Proof (Run #39731438810)
 
-All 10 jobs in the official GitHub Actions workflow passed:
-1. `PHP 8.3 - L12.*` (Job ID: 119136985230): ✅ Success
-2. `PostgreSQL Integration` (Job ID: 119136985236): ✅ Success
-3. `MySQL Integration` (Job ID: 119136985390): ✅ Success
-4. `MariaDB Integration` (Job ID: 119136985439): ✅ Success
-5. `Code Quality (Pint & PHPStan)` (Job ID: 119136985442): ✅ Success
-6. `PHP 8.3 - L11.*` (Job ID: 119136985467): ✅ Success
-7. `PHP 8.4 - L12.*` (Job ID: 119136985526): ✅ Success
-8. `PHP 8.4 - L11.*` (Job ID: 119136985529): ✅ Success
-9. `PHP 8.2 - L11.*` (Job ID: 119136985641): ✅ Success
-10. `PHP 8.2 - L12.*` (Job ID: 119136985690): ✅ Success
+All 12 jobs in the official GitHub Actions workflow passed:
+1. `MariaDB Integration` (Job ID: 119667152989): ✅ Success
+2. `MySQL Integration` (Job ID: 119667153128): ✅ Success
+3. `PHP 8.3 - L12.*` (Job ID: 119667153136): ✅ Success
+4. `PostgreSQL Integration` (Job ID: 119667153222): ✅ Success
+5. `PHP 8.4 - L13.*` (Job ID: 119667153237): ✅ Success
+6. `PHP 8.4 - L11.*` (Job ID: 119667153238): ✅ Success
+7. `PHP 8.2 - L11.*` (Job ID: 119667153255): ✅ Success
+8. `PHP 8.3 - L11.*` (Job ID: 119667153257): ✅ Success
+9. `PHP 8.2 - L12.*` (Job ID: 119667153264): ✅ Success
+10. `PHP 8.4 - L12.*` (Job ID: 119667153270): ✅ Success
+11. `Code Quality (Pint & PHPStan)` (Job ID: 119667153276): ✅ Success
+12. `PHP 8.3 - L13.*` (Job ID: 119667153308): ✅ Success
