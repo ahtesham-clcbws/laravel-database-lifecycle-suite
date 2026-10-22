@@ -44,6 +44,6 @@ In automated matrix environments running downstream `laravel/framework ^11.0` (w
 | **PKSA-mdq4-51ck-6kdq** | Moderate | CRLF injection in default email rule | `<12.60.0` | Duplicate upstream CVE report of PKSA-3r5d-mb8f-1qw9. |
 
 ### Technical Policy & Residual Risk Acceptance:
-1. **Zero Production Risk**: These advisories do not affect any code or public APIs in `clcbws/laravel-database-lifecycle-suite`.
+1. **Low Downstream Exploitability**: These advisories originate within upstream Laravel 11.x subsystems (HTTP exception page formatting, signed URL routing, and email validation) that are not invoked by this library's CLI commands, auditors, or database algorithms. However, applications running Laravel 11.x remain vulnerable to these issues within their own application layer if those upstream features are consumed, as Laravel 11.x has reached upstream End-of-Life (EOL) and will not receive security backports.
 2. **Matrix Pinning**: Only the 4 downstream EOL advisories are retained in `composer.json` solely to allow Composer 2.10+ matrix testing on Laravel 11.x without stalling test execution.
-3. **No Unresolved Vulnerabilities**: All production dependencies on Laravel 12.x are 100% patched and advisory-free.
+3. **Upgrade Recommendation**: All production applications are advised to upgrade to actively supported framework releases (Laravel 12.x or 13.x), which are 100% patched and advisory-free.

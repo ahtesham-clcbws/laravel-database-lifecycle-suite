@@ -308,4 +308,55 @@ class VerificationRunnerResilienceTest extends TestCase
 
         unlink($tmpManifest);
     }
+
+    public function test_previous_successful_report_is_preserved_on_failure(): void
+    {
+        $latestManifest = "{$this->rootDir}/reports/latest/manifest.json";
+        $this->assertFileExists($latestManifest);
+        $originalContent = file_get_contents($latestManifest);
+        $originalData = json_decode($originalContent, true);
+        $this->assertEquals('PASS', $originalData['overall_status']);
+
+        $tmpDir = sys_get_temp_dir().'/fail-preserve-'.uniqid();
+        mkdir($tmpDir);
+        $tmpLock = $tmpDir.'/fail.lock';
+        $mockPint = $tmpDir.'/pint';
+        file_put_contents($mockPint, "#!/usr/bin/env bash\nexit 1\n");
+        chmod($mockPint, 0755);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec("PINT_BIN=\"{$mockPint}\" VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=sqlite 2>&1", $output, $exitCode);
+
+            $this->assertNotEquals(0, $exitCode);
+
+            // Assert that reports/latest/manifest.json was NOT overwritten by the failed run
+            $currentContent = file_get_contents($latestManifest);
+            $currentData = json_decode($currentContent, true);
+            $this->assertEquals('PASS', $currentData['overall_status']);
+            $this->assertEquals($originalData['run_id'], $currentData['run_id']);
+        } finally {
+            unlink($mockPint);
+            @unlink($tmpLock);
+            rmdir($tmpDir);
+        }
+    }
+
+    public function test_occupied_database_port_is_detected(): void
+    {
+        // 5432 is occupied by the local PostgreSQL service
+        $tmpLock = sys_get_temp_dir().'/occupied-'.uniqid().'.lock';
+        try {
+            $output = [];
+            $exitCode = 0;
+            // Attempt to bind MySQL check to port 5432 which is already open
+            exec("DB_MYSQL_PORT=5432 VERIFY_LOCK_FILE=\"{$tmpLock}\" bash {$this->rootDir}/scripts/verify-release.sh --database=mysql 2>&1", $output, $exitCode);
+
+            $this->assertNotEquals(0, $exitCode);
+            $this->assertStringContainsString('already in use', implode("\n", $output));
+        } finally {
+            @unlink($tmpLock);
+        }
+    }
 }

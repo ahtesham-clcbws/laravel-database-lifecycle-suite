@@ -103,6 +103,51 @@ MARIA_PID=""
 MARIA_TMP=""
 TMP_COMPOSER_AUDIT=""
 
+check_port_free() {
+    local PORT="$1"
+    local NAME="$2"
+    if php -r "exit(@fsockopen('127.0.0.1', (int)\$argv[1], \$errno, \$errstr, 0.5) ? 0 : 1);" "${PORT}" 2>/dev/null; then
+        echo "ERROR: Port ${PORT} required for isolated ${NAME} service is already in use by another process." >&2
+        return 1
+    fi
+    return 0
+}
+
+wait_for_port_ready() {
+    local PORT="$1"
+    local MAX_RETRIES="${2:-20}"
+    local COUNT=0
+    while [ $COUNT -lt $MAX_RETRIES ]; do
+        if php -r "exit(@fsockopen('127.0.0.1', (int)\$argv[1], \$errno, \$errstr, 0.3) ? 0 : 1);" "${PORT}" 2>/dev/null; then
+            return 0
+        fi
+        sleep 0.2
+        COUNT=$((COUNT + 1))
+    done
+    return 1
+}
+
+extract_metrics_json() {
+    local LOG_FILE="$1"
+    if [ ! -f "${LOG_FILE}" ]; then
+        echo '{"tests": 0, "assertions": 0, "skipped": 0, "failures": 0}'
+        return
+    fi
+    php -r '
+    $c = @file_get_contents($argv[1]);
+    $tests = 0; $assertions = 0; $skipped = 0; $failures = 0;
+    if (preg_match("/OK \((\d+) tests, (\d+) assertions\)/", $c, $m)) {
+        $tests = (int)$m[1]; $assertions = (int)$m[2];
+    } elseif (preg_match("/Tests: (\d+), Assertions: (\d+)(?:, Failures: (\d+))?(?:, Skipped: (\d+))?/", $c, $m)) {
+        $tests = (int)$m[1];
+        $assertions = (int)$m[2];
+        if (isset($m[3]) && is_numeric($m[3])) $failures = (int)$m[3];
+        if (isset($m[4]) && is_numeric($m[4])) $skipped = (int)$m[4];
+    }
+    echo json_encode(["tests" => $tests, "assertions" => $assertions, "skipped" => $skipped, "failures" => $failures]);
+    ' "${LOG_FILE}" 2>/dev/null || echo '{"tests": 0, "assertions": 0, "skipped": 0, "failures": 0}'
+}
+
 write_manifest_and_summary() {
     local END_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
     
@@ -158,6 +203,11 @@ write_manifest_and_summary() {
         fi
     fi
 
+    local METRICS_SQLITE=$(extract_metrics_json "${RUN_DIR}/phpunit_sqlite.log")
+    local METRICS_MYSQL=$(extract_metrics_json "${RUN_DIR}/phpunit_mysql.log")
+    local METRICS_MARIA=$(extract_metrics_json "${RUN_DIR}/phpunit_mariadb.log")
+    local METRICS_PGSQL=$(extract_metrics_json "${RUN_DIR}/phpunit_pgsql.log")
+
     # Write manifest.json inside RUN_DIR
     cat <<EOF > "${RUN_DIR}/manifest.json"
 {
@@ -194,6 +244,12 @@ write_manifest_and_summary() {
     "app_integration_laravel_11": "${APP_INTEGRATION_L11_STATUS}",
     "app_integration_laravel_12": "${APP_INTEGRATION_L12_STATUS}",
     "app_integration_laravel_13": "${APP_INTEGRATION_L13_STATUS}"
+  },
+  "test_metrics": {
+    "sqlite": ${METRICS_SQLITE},
+    "mysql": ${METRICS_MYSQL},
+    "mariadb": ${METRICS_MARIA},
+    "postgresql": ${METRICS_PGSQL}
   }
 }
 EOF
@@ -300,7 +356,7 @@ cleanup() {
         kill "${MYSQL_PID}" 2>/dev/null || true
         wait "${MYSQL_PID}" 2>/dev/null || true
     fi
-    if [ -n "${MYSQL_TMP}" ] && [ -d "${MYSQL_TMP}" ]; then
+    if [ -n "${MYSQL_TMP}" ] && [ -d "${MYSQL_TMP}" ] && [[ "${MYSQL_TMP}" =~ ^/tmp/mysql-verify- ]]; then
         rm -rf "${MYSQL_TMP}" 2>/dev/null || true
     fi
 
@@ -308,17 +364,19 @@ cleanup() {
         kill "${MARIA_PID}" 2>/dev/null || true
         wait "${MARIA_PID}" 2>/dev/null || true
     fi
-    if [ -n "${MARIA_TMP}" ] && [ -d "${MARIA_TMP}" ]; then
+    if [ -n "${MARIA_TMP}" ] && [ -d "${MARIA_TMP}" ] && [[ "${MARIA_TMP}" =~ ^/tmp/mariadb-verify- ]]; then
         rm -rf "${MARIA_TMP}" 2>/dev/null || true
     fi
 
-    if [ -n "${TMP_COMPOSER_AUDIT}" ] && [ -f "${TMP_COMPOSER_AUDIT}" ]; then
+    if [ -n "${TMP_COMPOSER_AUDIT}" ] && [ -f "${TMP_COMPOSER_AUDIT}" ] && [[ "${TMP_COMPOSER_AUDIT}" =~ ^/tmp/composer-audit- ]]; then
         rm -f "${TMP_COMPOSER_AUDIT}" 2>/dev/null || true
     fi
 
     # If exit code was nonzero or interrupted before reaching clean finish
-    if [ $EXIT_CODE -ne 0 ] && [ "${OVERALL_STATUS}" = "RUNNING" ]; then
-        OVERALL_STATUS="FAIL"
+    if [ $EXIT_CODE -ne 0 ]; then
+        if [ "${OVERALL_STATUS}" != "PARTIAL" ] || [ "${SELECTED_DB}" = "all" -a "${SELECTED_LV}" = "all" ]; then
+            OVERALL_STATUS="FAIL"
+        fi
     fi
 
     write_manifest_and_summary
@@ -419,6 +477,8 @@ PHPUNIT_MYSQL_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "mysql" ] || [ "${SELECTED_DB}" = "all" ]; then
     echo "[6a/8] Running Isolated MySQL Integration Tests..."
     if command -v "${MYSQLD_BIN}" >/dev/null 2>&1; then
+        check_port_free "${DB_MYSQL_PORT}" "MySQL" || exit 1
+
         MYSQL_TMP=$(mktemp -d /tmp/mysql-verify-XXXXXX)
         mkdir -p "${MYSQL_TMP}/data"
         cat << 'MYCFG' > "${MYSQL_TMP}/my.cnf"
@@ -436,7 +496,12 @@ MYCFG
         "${MYSQLD_BIN}" --defaults-file="${MYSQL_TMP}/my.cnf" --initialize-insecure >/dev/null 2>&1
         "${MYSQLD_BIN}" --defaults-file="${MYSQL_TMP}/my.cnf" > "${MYSQL_TMP}/mysqld.log" 2>&1 &
         MYSQL_PID=$!
-        sleep 3
+        
+        if ! wait_for_port_ready "${DB_MYSQL_PORT}" 25; then
+            echo "ERROR: Timed out waiting for isolated MySQL daemon on port ${DB_MYSQL_PORT}." >&2
+            PHPUNIT_MYSQL_STATUS="FAIL"
+            exit 1
+        fi
 
         MYSQL_VERSION=$(mysql -h 127.0.0.1 -P "${DB_MYSQL_PORT}" -u root -sN -e "SELECT @@version;" 2>/dev/null || echo "8.x")
         mysql -h 127.0.0.1 -P "${DB_MYSQL_PORT}" -u root -e "CREATE DATABASE IF NOT EXISTS lifecycle_test; CREATE DATABASE IF NOT EXISTS lifecycle_source_test;" >/dev/null 2>&1
@@ -467,11 +532,18 @@ PHPUNIT_MARIADB_STATUS="SKIPPED"
 if [ "${SELECTED_DB}" = "mariadb" ] || [ "${SELECTED_DB}" = "all" ]; then
     echo "[6b/8] Running MariaDB Multi-Engine Integration Tests..."
     if command -v mariadb-install-db >/dev/null 2>&1 && command -v mariadbd >/dev/null 2>&1; then
+        check_port_free "${DB_MARIA_PORT}" "MariaDB" || exit 1
+
         MARIA_TMP=$(mktemp -d /tmp/mariadb-verify-XXXXXX)
         mariadb-install-db --datadir="${MARIA_TMP}" --auth-root-authentication-method=normal >/dev/null 2>&1
         mariadbd --datadir="${MARIA_TMP}" --port="${DB_MARIA_PORT}" --socket="${MARIA_TMP}/mysql.sock" --pid-file="${MARIA_TMP}/mysql.pid" --skip-networking=0 --bind-address=127.0.0.1 >/dev/null 2>&1 &
         MARIA_PID=$!
-        sleep 2
+        
+        if ! wait_for_port_ready "${DB_MARIA_PORT}" 25; then
+            echo "ERROR: Timed out waiting for isolated MariaDB daemon on port ${DB_MARIA_PORT}." >&2
+            PHPUNIT_MARIADB_STATUS="FAIL"
+            exit 1
+        fi
 
         MARIA_VERSION=$(mariadb -h 127.0.0.1 -P "${DB_MARIA_PORT}" -u root -sN -e "SELECT @@version;" 2>/dev/null || echo "MariaDB")
         mariadb -h 127.0.0.1 -P "${DB_MARIA_PORT}" -u root -e "CREATE DATABASE IF NOT EXISTS lifecycle_test; CREATE DATABASE IF NOT EXISTS lifecycle_source_test;" >/dev/null 2>&1
@@ -565,6 +637,28 @@ fi
 
 # Check final certification condition
 if [ "${SELECTED_DB}" = "all" ] && [ "${SELECTED_LV}" = "all" ]; then
+    # Verify that all required evidence log files exist and are non-empty
+    REQUIRED_LOGS=(
+        "composer_validate.log"
+        "composer_audit.log"
+        "pint.log"
+        "phpstan.log"
+        "phpunit_sqlite.log"
+        "phpunit_mysql.log"
+        "phpunit_mariadb.log"
+        "phpunit_pgsql.log"
+        "laravel11_integration.log"
+        "laravel12_integration.log"
+        "laravel13_integration.log"
+    )
+    for log_name in "${REQUIRED_LOGS[@]}"; do
+        if [ ! -s "${RUN_DIR}/${log_name}" ]; then
+            echo "ERROR: Required verification evidence file ${log_name} is missing or empty in ${RUN_DIR}" >&2
+            OVERALL_STATUS="FAIL"
+            exit 1
+        fi
+    done
+
     OVERALL_STATUS="PASS"
     echo "======================================================================"
     echo " All Quality Gates & Real App Scenarios Completed Successfully!"

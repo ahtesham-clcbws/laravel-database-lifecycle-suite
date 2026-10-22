@@ -11,7 +11,7 @@
 ## 📋 Compatibility Matrix
 
 - **PHP**: `^8.2` (Verified across PHP 8.2, 8.3, 8.4, and 8.5)
-- **Framework**: Laravel `11.x` and `12.x`
+- **Framework**: Laravel `11.x`, `12.x`, and `13.x`
 - **Supported Databases**:
   - SQLite (3.35+)
   - MySQL (8.0+)

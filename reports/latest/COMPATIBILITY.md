@@ -21,14 +21,14 @@ Integration tests execute full migrations, schema captures, round-trip restorati
 
 | Engine | Verified Version | Connection Type | Tests Executed | Assertions | Result |
 |---|---|---|---|---|---|
-| **SQLite** | 3.54.0 | In-memory & File-based | 134 | 450 | **PASS (0 failures)** |
-| **MySQL** | 8.4.2 (Isolated Disposable Service) | TCP PDO (Port 3308) | 134 | 446 (2 driver-specific skips) | **PASS (0 failures)** |
-| **MariaDB** | 13.0.2 (Isolated Disposable Service) | TCP PDO (Port 3307) | 134 | 446 (2 driver-specific skips) | **PASS (0 failures)** |
-| **PostgreSQL** | 18.6 (Local Service) | TCP / Socket PDO (Port 5432) | 134 | 449 (1 driver-specific skip) | **PASS (0 failures)** |
+| **SQLite** | 3.54.0 | In-memory & File-based | 147 | 485 | **PASS (0 failures)** |
+| **MySQL** | 8.4.2 (Isolated Disposable Service) | TCP PDO (Port 3308) | 147 | 481 (2 driver-specific skips) | **PASS (0 failures)** |
+| **MariaDB** | 13.0.2-MariaDB (Isolated Disposable Service) | TCP PDO (Port 3307) | 147 | 481 (2 driver-specific skips) | **PASS (0 failures)** |
+| **PostgreSQL** | 18.6 (Local Service) | TCP / Socket PDO (Port 5432) | 147 | 484 (1 driver-specific skip) | **PASS (0 failures)** |
 
 *\*Note on driver-specific skipped tests*:
 - In PostgreSQL: `test_it_permits_backtick_quoted_identifiers` is skipped because backtick quoting (`` `column` ``) is MySQL/MariaDB syntax, whereas PostgreSQL adheres to ANSI standard double quotes (`"`).
-- In MySQL / MariaDB: Specific ANSI identifier quoting tests configured for PostgreSQL are skipped where appropriate.
+- In MySQL / MariaDB: Index health auditor skips redundant index creation tests because MySQL/MariaDB automatically indexes foreign key columns natively upon constraint creation (`IndexHealthAuditorTest`). Quoting tests for double-quoted identifiers requiring ANSI_QUOTES mode are also skipped where appropriate.
 
 ---
 
